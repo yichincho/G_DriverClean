@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" class="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google 雲端硬碟與 Gmail 空間清理中心</title>
+  <meta name="description"
+    content="檢視 Google 帳號總容量使用情形，依檔案大小與資料天數篩選並批次刪除 Google 雲端硬碟大檔案與 Gmail 大容量信件，內建完整 OAuth 登入設定教學。">
+  <meta property="og:title" content="Google 雲端硬碟與 Gmail 空間清理中心">
+  <meta property="og:description" content="本地端直接連線 Google 官方 API，依天數與容量快速整理雲端硬碟與 Gmail 空間。">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23181818' stroke='%23313131' stroke-width='2'/%3E%3Cpath d='M9 21L16 9L23 21H9Z' fill='none' stroke='%23FFFFFF' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='17' r='2' fill='%233B82F6'/%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;600;700&family=Manrope:wght@400;600;700&family=Noto+Sans+TC:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', 'Noto Sans TC', 'sans-serif'],
+            mono: ['Geist Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="bg-[#000000] text-white antialiased">
+  <a href="#main-content" class="skip-link">跳至主要內容</a>
+
+  <!-- 協議警告橫幅（直接以 file:// 開啟時自動顯示） -->
+  <div id="protocolWarningBanner" class="hidden max-w-[1120px] mx-auto px-4 pt-4">
+    <div class="surface-card-warm flex flex-col md:flex-row md:items-center justify-between gap-4" role="alert">
+      <div class="flex items-start gap-3">
+        <i class="ph ph-warning-circle text-2xl text-[#F59E0B] shrink-0" aria-hidden="true"></i>
+        <div>
+          <p class="text-base font-semibold text-white">偵測到目前透過本機檔案路徑開啟（file 通訊協定）</p>
+          <p class="text-sm text-[#A3A3A3] mt-1">Google OAuth 登入僅允許在本地網址執行。請雙擊資料夾內的 <code
+              class="font-mono text-white px-1">啟動雲端清理工具.bat</code>，或執行 <code
+              class="font-mono text-white px-1">python server.py</code> 後開啟 <code
+              class="font-mono text-white px-1">http://localhost:8080</code>。</p>
+        </div>
+      </div>
+      <button type="button" data-nav-target="guide" class="btn-secondary shrink-0 text-sm">查看啟動教學</button>
+    </div>
+  </div>
+
+  <!-- 置頂浮動導覽列 -->
+  <header class="floating-nav-wrap">
+    <nav class="floating-nav" aria-label="主要功能導覽">
+      <div class="flex items-center gap-3">
+        <button type="button" data-nav-target="dashboard"
+          class="flex items-center gap-2 text-left cursor-pointer bg-transparent border-0 p-0">
+          <span
+            class="w-8 h-8 rounded-lg bg-[#272727] border border-[#313131] flex items-center justify-center shrink-0">
+            <i class="ph ph-hard-drives text-lg text-white" aria-hidden="true"></i>
+          </span>
+          <span class="text-sm font-semibold text-white whitespace-nowrap">Google 空間清理中心</span>
+        </button>
+      </div>
+
+      <div class="hidden md:flex items-center gap-1" role="tablist" aria-label="功能分頁">
+        <button type="button" class="nav-link-btn is-active" data-nav-target="dashboard" role="tab"
+          aria-selected="true">
+          <i class="ph ph-chart-pie-slice text-base" aria-hidden="true"></i>
+          <span>使用量總覽</span>
+        </button>
+        <button type="button" class="nav-link-btn" data-nav-target="drive" role="tab" aria-selected="false">
+          <i class="ph ph-folder-notch-open text-base" aria-hidden="true"></i>
+          <span>雲端硬碟清理</span>
+        </button>
+        <button type="button" class="nav-link-btn" data-nav-target="gmail" role="tab" aria-selected="false">
+          <i class="ph ph-envelope-simple text-base" aria-hidden="true"></i>
+          <span>Gmail 清理</span>
+        </button>
+        <button type="button" class="nav-link-btn" data-nav-target="guide" role="tab" aria-selected="false">
+          <i class="ph ph-book-open-text text-base" aria-hidden="true"></i>
+          <span>登入教學</span>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span id="navAuthBadge"
+          class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1F1F1F] border border-[#313131] text-xs font-semibold text-[#A3A3A3]">
+          <span id="navStatusDot" class="w-2 h-2 rounded-full bg-[#737373]"></span>
+          <span id="navStatusText">尚未連線帳號</span>
+        </span>
+        <button type="button" id="navAuthActionBtn" class="btn-header hidden sm:inline-flex">
+          <i class="ph ph-sign-in text-base" aria-hidden="true"></i>
+          <span>登入 Google</span>
+        </button>
+        <button type="button" id="mobileMenuToggleBtn" class="md:hidden btn-header" aria-label="開啟選單"
+          aria-expanded="false">
+          <i id="mobileMenuIcon" class="ph ph-list text-lg" aria-hidden="true"></i>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- 手機版全螢幕選單 -->
+  <div id="mobileDrawer" class="mobile-drawer" aria-hidden="true">
+    <div class="flex items-center justify-between pb-4 border-b border-[#313131]">
+      <span class="text-base font-semibold text-white">功能選單</span>
+      <button type="button" id="mobileMenuCloseBtn" class="btn-header" aria-label="關閉選單">
+        <i class="ph ph-x text-lg" aria-hidden="true"></i>
+      </button>
+    </div>
+    <button type="button" class="nav-link-btn mobile-drawer-item justify-start text-base" data-nav-target="dashboard">
+      <i class="ph ph-chart-pie-slice text-lg" aria-hidden="true"></i>
+      <span>使用量總覽</span>
+    </button>
+    <button type="button" class="nav-link-btn mobile-drawer-item justify-start text-base" data-nav-target="drive">
+      <i class="ph ph-folder-notch-open text-lg" aria-hidden="true"></i>
+      <span>Google 雲端硬碟清理</span>
+    </button>
+    <button type="button" class="nav-link-btn mobile-drawer-item justify-start text-base" data-nav-target="gmail">
+      <i class="ph ph-envelope-simple text-lg" aria-hidden="true"></i>
+      <span>Gmail 大信件與附件清理</span>
+    </button>
+    <button type="button" class="nav-link-btn mobile-drawer-item justify-start text-base" data-nav-target="guide">
+      <i class="ph ph-book-open-text text-lg" aria-hidden="true"></i>
+      <span>登入設定一步一步教學</span>
+    </button>
+    <div class="mt-4 mobile-drawer-item">
+      <button type="button" id="mobileAuthActionBtn" class="btn-primary w-full">
+        <i class="ph ph-google-logo text-lg" aria-hidden="true"></i>
+        <span>登入 Google 帳號</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 全域浮動狀態通知區（始終置頂於所有視窗之上） -->
+  <div id="globalToastContainer" class="floating-toast-container hidden" aria-live="polite">
+    <div id="globalToastBox" class="surface-card-compact flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <i id="globalToastIcon" class="ph ph-info text-xl shrink-0" aria-hidden="true"></i>
+        <p id="globalToastText" class="text-sm text-white m-0"></p>
+      </div>
+      <button type="button" id="globalToastCloseBtn"
+        class="text-[#A3A3A3] hover:text-white bg-transparent border-0 cursor-pointer p-1" aria-label="關閉訊息">
+        <i class="ph ph-x text-base" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- 主要內容區 -->
+  <main id="main-content" class="max-w-[1120px] mx-auto px-4 pt-8 pb-16 space-y-8">
+
+    <!-- ====================================================================
+         置頂動態空間用量與目標差異視覺化儀表板（跨分頁即時連動）
+         ==================================================================== -->
+    <section id="liveStorageVisualizer" class="surface-card space-y-6" aria-label="動態空間用量與目標差異圖示">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <span class="w-10 h-10 rounded-xl bg-[#272727] border border-[#313131] flex items-center justify-center shrink-0">
+            <i class="ph ph-gauge text-xl text-[#3B82F6]" aria-hidden="true"></i>
+          </span>
+          <div>
+            <h2 class="text-xl font-bold text-white">動態空間用量與目標差異儀表板</h2>
+            <p class="text-xs text-[#A3A3A3] mt-0.5">即時對比「目前實際用量」與「目標安全上限」，下方勾選檔案或信件時將同步預覽釋放效果</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="liveGapStatusPill" class="px-3 py-1 rounded-lg text-xs font-semibold diff-pill-neutral">等待載入帳號空間</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <!-- 左側：SVG 雙環動態空間圓弧儀表 -->
+        <div class="lg:col-span-4 surface-card-compact flex flex-col items-center justify-center gap-4">
+          <div class="relative flex items-center justify-center">
+            <svg class="gauge-svg" viewBox="0 0 160 160" role="img" aria-label="目前用量與目標上限雙環動態圓弧圖">
+              <!-- 外環底軌（目前使用量） -->
+              <circle class="gauge-arc-bg" cx="80" cy="80" r="66" stroke-width="10"></circle>
+              <!-- 內環底軌（清理後預估） -->
+              <circle class="gauge-arc-bg" cx="80" cy="80" r="50" stroke-width="8"></circle>
+
+              <!-- 外環動態進度 -->
+              <circle id="svgOuterArc" class="gauge-arc-fg" cx="80" cy="80" r="66" stroke-width="10"
+                stroke="#3B82F6" stroke-dasharray="414.69" stroke-dashoffset="414.69"></circle>
+              <!-- 內環動態進度（扣除已勾選） -->
+              <circle id="svgInnerArc" class="gauge-arc-projected" cx="80" cy="80" r="50" stroke-width="8"
+                stroke="#10B981" stroke-dasharray="314.16" stroke-dashoffset="314.16"></circle>
+
+              <!-- 目標安全上限刻度線 -->
+              <line id="svgTargetMarker" x1="80" y1="80" x2="80" y2="80" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"></line>
+            </svg>
+
+            <div class="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+              <span class="text-xs text-[#A3A3A3]">目前佔比</span>
+              <span id="gaugeCenterPct" class="text-2xl font-bold font-mono-num text-white">0.0%</span>
+              <span id="gaugeCenterSub" class="text-xs font-mono-num text-[#737373]">目標上限 80%</span>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-center gap-4 text-xs text-[#A3A3A3]">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#3B82F6]"></span>外環：目前用量
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#10B981]"></span>內環：勾選清理後
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-2.5 h-0.5 bg-white"></span>白線：目標上限
+            </span>
+          </div>
+        </div>
+
+        <!-- 右側：動態差距尺規與數據卡片 -->
+        <div class="lg:col-span-8 space-y-4">
+          <!-- 尺規一：目前實際分佈 vs 目標警戒線 -->
+          <div class="surface-card-compact space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span class="font-semibold text-white">目前空間用量分布與目標警戒線對照</span>
+              <span id="liveRulerCaption" class="font-mono-num text-[#A3A3A3]">總目標配額 15.00 GB · 須預留 20%</span>
+            </div>
+
+            <div class="relative pt-4">
+              <div id="liveTargetLineLabel" class="absolute top-0 text-xs font-mono-num text-white -translate-x-1/2 whitespace-nowrap" style="left: 80%;">
+                目標上限 80%
+              </div>
+              <div class="ruler-track">
+                <div id="liveReserveZone" class="ruler-reserve-zone" style="width: 20%;"></div>
+                <div class="ruler-fill-stack">
+                  <div id="liveBarDrive" class="h-full rounded bg-[#3B82F6]" style="width: 0%;"></div>
+                  <div id="liveBarTrash" class="h-full rounded bg-[#EF4444]" style="width: 0%;"></div>
+                  <div id="liveBarGmail" class="h-full rounded bg-[#F59E0B]" style="width: 0%;"></div>
+                </div>
+                <div id="liveTargetLine" class="ruler-target-line" style="left: 80%;"></div>
+              </div>
+            </div>
+
+            <!-- 尺規二：勾選後模擬水位 -->
+            <div class="space-y-1.5 pt-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-[#A3A3A3]">扣除目前已勾選項目後之預估水位</span>
+                <span id="liveProjectedText" class="font-mono-num text-[#10B981]">尚未勾選待刪項目</span>
+              </div>
+              <div class="ruler-track" style="height: 12px;">
+                <div id="liveProjectedBar" class="ruler-projected-fill" style="transform: scaleX(0);"></div>
+                <div id="liveProjectedTargetLine" class="ruler-target-line" style="left: 80%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 四格核心差異數據 -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="surface-card-inner space-y-1">
+              <span class="text-xs text-[#A3A3A3]">目前總用量</span>
+              <p id="liveCurrentUsageVal" class="text-base font-bold font-mono-num text-white">—</p>
+            </div>
+            <div class="surface-card-inner space-y-1">
+              <span class="text-xs text-[#A3A3A3]">目標安全上限</span>
+              <p id="liveTargetCapVal" class="text-base font-bold font-mono-num text-[#3B82F6]">12.00 GB</p>
+            </div>
+            <div class="surface-card-inner space-y-1">
+              <span class="text-xs text-[#A3A3A3]">目前與目標差異</span>
+              <p id="liveGapDiffVal" class="text-base font-bold font-mono-num text-[#F59E0B]">—</p>
+            </div>
+            <div class="surface-card-inner space-y-1">
+              <span class="text-xs text-[#A3A3A3]">已勾選預計釋放</span>
+              <p id="liveSelectedReleaseVal" class="text-base font-bold font-mono-num text-[#10B981]">0 B</p>
+            </div>
+          </div>
+
+          <!-- 互動式目標基準與預留比例滑桿 -->
+          <div class="surface-card-inner grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+            <div>
+              <label for="liveTargetModeSelect" class="block text-xs font-semibold text-[#A3A3A3] mb-1">對比目標基準</label>
+              <select id="liveTargetModeSelect" class="field-select text-xs">
+                <option value="15" selected>12/24 一般使用者（15 GB 配額）</option>
+                <option value="current">目前帳號總配額</option>
+                <option value="100">Google One 基礎版（100 GB）</option>
+              </select>
+            </div>
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <label for="liveReserveSlider" class="font-semibold text-[#A3A3A3]">目標預留空間比例</label>
+                <span id="liveReservePctLabel" class="font-mono-num font-bold text-white">保留 20%</span>
+              </div>
+              <input id="liveReserveSlider" type="range" min="5" max="50" step="5" value="20" class="range-slider">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         分頁 1：使用量總覽（Dashboard）
+         ==================================================================== -->
+    <section id="tab-dashboard" data-tab-panel="dashboard" class="space-y-8">
+      <!-- Hero 導覽區塊 -->
+      <div class="surface-card flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+        <div class="space-y-4">
+          <div
+            class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-[#272727] border border-[#313131] text-xs font-semibold text-[#A3A3A3]">
+            <i class="ph ph-shield-check text-sm text-[#10B981]" aria-hidden="true"></i>
+            <span>本地瀏覽器直連 Google API ，不經過任何第三方伺服器</span>
+          </div>
+          <h1 class="hero-heading">
+            精準檢視雲端空間，<br>按檔案天數與大小批次釋放容量
+          </h1>
+          <p class="hero-subheadline">
+            登入您的 Google 帳號，立即分析 Google 雲端硬碟與 Gmail 的空間佔用比例，並透過天數門檻與容量篩選找出長期佔位的大檔案與舊信件。
+          </p>
+          <div class="flex flex-wrap items-center gap-3 pt-2">
+            <button type="button" id="heroLoginBtn" class="btn-primary">
+              <i class="ph ph-google-logo text-lg" aria-hidden="true"></i>
+              <span>登入 Google 帳號並載入空間</span>
+            </button>
+            <button type="button" id="heroDemoBtn" class="btn-secondary">
+              <i class="ph ph-play-circle text-lg" aria-hidden="true"></i>
+              <span>進入模擬展示模式體驗</span>
+            </button>
+            <button type="button" data-nav-target="guide" class="btn-secondary">
+              <i class="ph ph-key text-lg" aria-hidden="true"></i>
+              <span>申請 Client ID 教學</span>
+            </button>
+          </div>
+          <p id="heroAuthHint" class="text-xs text-[#737373]">
+            目前狀態：尚未設定 Google OAuth 2.0 Client ID。可先點擊「進入模擬展示模式體驗」測試所有功能，或開啟登入教學完成 5 分鐘設定。
+          </p>
+        </div>
+
+        <!-- 右側帳號狀態與快速設定卡 -->
+        <aside class="w-full lg:w-[360px] shrink-0 surface-card-compact space-y-4" aria-label="帳號與憑證設定狀態">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-[#A3A3A3]">目前連線模式</span>
+            <span id="accountModeBadge"
+              class="px-2 py-1 rounded-md bg-[#272727] border border-[#313131] text-xs font-mono text-[#A3A3A3]">未登入</span>
+          </div>
+
+          <div id="userProfileCard" class="surface-card-inner flex items-center gap-3">
+            <div id="userAvatarPlaceholder"
+              class="w-10 h-10 rounded-lg bg-[#272727] border border-[#313131] flex items-center justify-center shrink-0">
+              <i class="ph ph-user text-xl text-[#A3A3A3]" aria-hidden="true"></i>
+            </div>
+            <img id="userAvatarImg" src="" alt="使用者頭像"
+              class="hidden w-10 h-10 rounded-lg object-cover border border-[#313131] shrink-0">
+            <div class="min-w-0 flex-1">
+              <p id="userDisplayName" class="text-sm font-semibold text-white truncate">訪客使用者</p>
+              <p id="userEmailText" class="text-xs text-[#A3A3A3] truncate font-mono">請登入帳號或啟動模擬模式</p>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label for="quickClientIdInput" class="block text-xs font-semibold text-[#A3A3A3]">Google OAuth 2.0 Client
+              ID（快速儲存）</label>
+            <div class="flex items-center gap-2">
+              <input id="quickClientIdInput" type="text" class="field-input font-mono text-xs"
+                placeholder="貼上 xxxx.apps.googleusercontent.com">
+              <button type="button" id="quickSaveClientIdBtn" class="btn-secondary shrink-0 text-sm">儲存</button>
+            </div>
+            <p id="quickClientIdFeedback" class="text-xs text-[#737373]"></p>
+          </div>
+
+          <div id="signedInActionRow" class="hidden pt-2 flex items-center gap-2">
+            <button type="button" id="refreshQuotaBtn" class="btn-secondary flex-1 text-sm">
+              <i class="ph ph-arrows-clockwise text-base" aria-hidden="true"></i>
+              <span>重新整理容量</span>
+            </button>
+            <button type="button" id="signOutBtn" class="btn-danger text-sm">
+              <i class="ph ph-sign-out text-base" aria-hidden="true"></i>
+              <span>登出</span>
+            </button>
+          </div>
+        </aside>
+      </div>
+
+      <!-- 空間使用量分析卡片區 -->
+      <div class="surface-card space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold text-white">帳號空間使用量總覽</h2>
+            <p class="text-sm text-[#A3A3A3] mt-1">即時統計 Google 帳號整體容量配置，協助定位最大空間消耗來源</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-[#A3A3A3]">資料來源：</span>
+            <span id="quotaSourceLabel"
+              class="text-xs font-mono px-2 py-1 rounded-md bg-[#272727] border border-[#313131] text-white">等待載入</span>
+          </div>
+        </div>
+
+        <!-- 進度條與總數 -->
+        <div class="surface-card-compact space-y-4">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <div class="flex items-baseline gap-2">
+              <span id="quotaUsedBig" class="text-3xl font-bold font-mono-num text-white">0 GB</span>
+              <span class="text-sm text-[#A3A3A3]">已使用 / 總容量</span>
+              <span id="quotaLimitBig" class="text-base font-semibold font-mono-num text-[#A3A3A3]">15 GB</span>
+            </div>
+            <span id="quotaPercentLabel" class="text-sm font-semibold font-mono-num text-white">0.0%</span>
+          </div>
+
+          <div class="quota-bar-track" role="img" aria-label="Google 空間使用比例長條圖">
+            <div id="barDriveSegment" class="quota-segment bg-[#3B82F6]" style="width: 0%" title="Google 雲端硬碟"></div>
+            <div id="barTrashSegment" class="quota-segment bg-[#EF4444]" style="width: 0%" title="雲端硬碟垃圾桶"></div>
+            <div id="barGmailSegment" class="quota-segment bg-[#F59E0B]" style="width: 0%" title="Gmail 與 Google 相簿等服務">
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-6 text-xs text-[#A3A3A3]">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-sm bg-[#3B82F6]"></span>
+              <span>Google 雲端硬碟（使用中）</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-sm bg-[#EF4444]"></span>
+              <span>雲端硬碟垃圾桶（待徹底釋放）</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-sm bg-[#F59E0B]"></span>
+              <span>Gmail 與其他服務（相簿、備份）</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 四項指標卡片 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="surface-card-compact space-y-2">
+            <div class="flex items-center justify-between text-[#A3A3A3]">
+              <span class="text-xs font-semibold">Google 雲端硬碟</span>
+              <i class="ph ph-google-drive-logo text-lg text-[#3B82F6]" aria-hidden="true"></i>
+            </div>
+            <p id="statDriveUsage" class="text-2xl font-bold font-mono-num text-white">—</p>
+            <p class="text-xs text-[#737373]">包含文件、影片、壓縮檔與共用檔</p>
+          </div>
+
+          <div class="surface-card-compact space-y-2">
+            <div class="flex items-center justify-between text-[#A3A3A3]">
+              <span class="text-xs font-semibold">雲端硬碟垃圾桶</span>
+              <i class="ph ph-trash text-lg text-[#EF4444]" aria-hidden="true"></i>
+            </div>
+            <p id="statDriveTrash" class="text-2xl font-bold font-mono-num text-white">—</p>
+            <p class="text-xs text-[#737373]">移入垃圾桶仍計入空間配額</p>
+          </div>
+
+          <div class="surface-card-compact space-y-2">
+            <div class="flex items-center justify-between text-[#A3A3A3]">
+              <span class="text-xs font-semibold">Gmail 與其他服務</span>
+              <i class="ph ph-envelope text-lg text-[#F59E0B]" aria-hidden="true"></i>
+            </div>
+            <p id="statGmailOther" class="text-2xl font-bold font-mono-num text-white">—</p>
+            <p class="text-xs text-[#737373]">含 Gmail 附件與 Google 相簿佔用</p>
+          </div>
+
+          <div class="surface-card-compact space-y-2">
+            <div class="flex items-center justify-between text-[#A3A3A3]">
+              <span class="text-xs font-semibold">剩餘可用空間</span>
+              <i class="ph ph-hard-drive text-lg text-[#10B981]" aria-hidden="true"></i>
+            </div>
+            <p id="statFreeSpace" class="text-2xl font-bold font-mono-num text-white">—</p>
+            <p class="text-xs text-[#737373]">總配額扣除已使用空間</p>
+          </div>
+        </div>
+
+        <!-- 一鍵智慧清理捷徑 -->
+        <div class="space-y-3 pt-2">
+          <h3 class="text-base font-semibold text-white">快速清理建議捷徑</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <button type="button" data-quick-action="drive-large-100"
+              class="surface-card-inner text-left hover:bg-[#272727] transition-colors cursor-pointer space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-white">Drive 100 MB 以上大檔</span>
+                <i class="ph ph-arrow-right text-base text-[#A3A3A3]" aria-hidden="true"></i>
+              </div>
+              <p class="text-xs text-[#A3A3A3]">快速列出體積最大的影片、備份與壓縮檔</p>
+            </button>
+
+            <button type="button" data-quick-action="drive-old-180"
+              class="surface-card-inner text-left hover:bg-[#272727] transition-colors cursor-pointer space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-white">Drive 超過 180 天資料</span>
+                <i class="ph ph-arrow-right text-base text-[#A3A3A3]" aria-hidden="true"></i>
+              </div>
+              <p class="text-xs text-[#A3A3A3]">篩選半年以上未修改的過期檔案與大型資料</p>
+            </button>
+
+            <button type="button" data-quick-action="drive-trash"
+              class="surface-card-inner text-left hover:bg-[#272727] transition-colors cursor-pointer space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-white">檢視 Drive 垃圾桶</span>
+                <i class="ph ph-arrow-right text-base text-[#A3A3A3]" aria-hidden="true"></i>
+              </div>
+              <p class="text-xs text-[#A3A3A3]">立即檢視並永久清空垃圾桶，立刻釋放空間</p>
+            </button>
+
+            <button type="button" data-quick-action="gmail-large-old"
+              class="surface-card-inner text-left hover:bg-[#272727] transition-colors cursor-pointer space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-white">Gmail 大於 5 MB 舊信件</span>
+                <i class="ph ph-arrow-right text-base text-[#A3A3A3]" aria-hidden="true"></i>
+              </div>
+              <p class="text-xs text-[#A3A3A3]">找出超過 180 天且含大附件的歷史郵件</p>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 12/24 一般使用者 20% 預留空間計算器 -->
+      <div class="surface-card space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div
+              class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-[#272727] border border-[#313131] text-xs font-semibold text-[#F59E0B] mb-2">
+              <i class="ph ph-calendar-check text-sm" aria-hidden="true"></i>
+              <span id="countdown1224Label">12/24 方案調整目標：至少保留 20% 可用空間</span>
+            </div>
+            <h2 class="text-2xl font-bold text-white">12/24 一般使用者 20% 預留空間達標分析</h2>
+            <p class="text-sm text-[#A3A3A3] mt-1">自動依目標帳號配額與 20% 緩衝比例，算出安全使用水位上限與目前還必須釋放的容量缺口。</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button type="button" id="autoSelectTargetBtn" class="btn-primary text-sm">
+              <i class="ph ph-magic-wand text-base" aria-hidden="true"></i>
+              <span>一鍵自動挑選待刪檔案達標</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 目標配額設定列 -->
+        <div class="surface-card-compact grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          <div>
+            <label for="targetPlanSelect" class="block text-xs font-semibold text-[#A3A3A3] mb-2">目標帳號方案配額</label>
+            <select id="targetPlanSelect" class="field-select">
+              <option value="15" selected>一般使用者免費版（15 GB）</option>
+              <option value="current">目前帳號配額</option>
+              <option value="100">Google One 基礎版（100 GB）</option>
+              <option value="custom">自訂目標容量（GB）</option>
+            </select>
+          </div>
+
+          <div id="customTargetGbWrap" class="hidden">
+            <label for="customTargetGbInput" class="block text-xs font-semibold text-[#A3A3A3] mb-2">自訂目標總配額（GB）</label>
+            <input id="customTargetGbInput" type="number" min="1" step="1" value="15" class="field-input font-mono">
+          </div>
+
+          <div>
+            <label for="reservePercentSelect" class="block text-xs font-semibold text-[#A3A3A3] mb-2">最低預留空間比例</label>
+            <select id="reservePercentSelect" class="field-select">
+              <option value="20" selected>保留 20%（最多使用 80%）</option>
+              <option value="25">保留 25%（最多使用 75%）</option>
+              <option value="30">保留 30%（最多使用 70%）</option>
+            </select>
+          </div>
+
+          <div class="surface-card-inner flex items-center justify-between gap-3">
+            <span class="text-xs text-[#A3A3A3]">安全使用上限</span>
+            <span id="targetSafeCapDisplay" class="text-base font-bold font-mono-num text-white">12.00 GB</span>
+          </div>
+        </div>
+
+        <!-- 達標進度與缺口指標 -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="surface-card-compact space-y-2">
+            <p class="text-xs font-semibold text-[#A3A3A3]">目前總使用量與目標佔比</p>
+            <p id="targetCurrentRatioText" class="text-2xl font-bold font-mono-num text-white">—</p>
+            <p id="targetCurrentRatioSub" class="text-xs text-[#737373]">請先登入帳號或啟動模擬展示模式</p>
+          </div>
+
+          <div class="surface-card-compact space-y-2">
+            <p class="text-xs font-semibold text-[#A3A3A3]">須預留空間（目標 20%）</p>
+            <p id="targetReserveBytesText" class="text-2xl font-bold font-mono-num text-[#3B82F6]">3.00 GB</p>
+            <p class="text-xs text-[#737373]">保留給日常收信、暫存與文件編輯緩衝</p>
+          </div>
+
+          <div class="surface-card-compact space-y-2">
+            <p class="text-xs font-semibold text-[#A3A3A3]">距離達標尚需刪除容量</p>
+            <p id="targetDeficitText" class="text-2xl font-bold font-mono-num text-[#F59E0B]">—</p>
+            <p id="targetDeficitSub" class="text-xs text-[#737373]">系統將優先列出最舊且佔空間的項目</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 優先清理方案建議與大資料層 / 長期未使用大檔案排行 -->
+      <div class="surface-card space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold text-white">優先清理方案與大資料層推薦</h2>
+            <p class="text-sm text-[#A3A3A3] mt-1">依據「資料夾佔用規模（大資料層）」與「最後開啟／修改天數」自動排序最安全且立竿見影的瘦身對象。</p>
+          </div>
+          <button type="button" id="refreshInsightsBtn" class="btn-secondary text-sm shrink-0">
+            <i class="ph ph-arrows-clockwise text-base" aria-hidden="true"></i>
+            <span>重新掃描大資料層</span>
+          </button>
+        </div>
+
+        <!-- 三大優先建議方案 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <article class="surface-card-compact flex flex-col justify-between gap-4">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <span
+                  class="px-2 py-1 rounded-md bg-[#064E3B] border border-[#065F46] text-xs font-semibold text-[#6EE7B7]">方案
+                  A · 第一優先</span>
+                <span id="planASizeBadge" class="text-sm font-bold font-mono-num text-white">—</span>
+              </div>
+              <h3 class="text-base font-bold text-white">清空垃圾桶與超過 1 年未用巨檔</h3>
+              <p class="text-xs text-[#A3A3A3]">先徹底清出垃圾桶，加上超過 365 天未開啟或未修改的 100 MB 以上大型檔案，風險最低。</p>
+            </div>
+            <button type="button" data-apply-plan="planA" class="btn-secondary text-sm w-full">套用方案 A 檢視清單</button>
+          </article>
+
+          <article class="surface-card-compact flex flex-col justify-between gap-4">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <span
+                  class="px-2 py-1 rounded-md bg-[#451A03] border border-[#78350F] text-xs font-semibold text-[#FCD34D]">方案
+                  B · 深度瘦身</span>
+                <span id="planBSizeBadge" class="text-sm font-bold font-mono-num text-white">—</span>
+              </div>
+              <h3 class="text-base font-bold text-white">半年以上 50 MB 舊檔與大附件信件</h3>
+              <p class="text-xs text-[#A3A3A3]">鎖定超過 180 天未動用的雲端壓縮包、影片檔，搭配 Gmail 大於 5 MB 歷史郵件一起清理。</p>
+            </div>
+            <button type="button" data-apply-plan="planB" class="btn-secondary text-sm w-full">套用方案 B 檢視清單</button>
+          </article>
+
+          <article class="surface-card-compact flex flex-col justify-between gap-4">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <span
+                  class="px-2 py-1 rounded-md bg-[#272727] border border-[#313131] text-xs font-semibold text-white">方案
+                  C · 大資料層清理</span>
+                <span id="planCSizeBadge" class="text-sm font-bold font-mono-num text-white">—</span>
+              </div>
+              <h3 class="text-base font-bold text-white">整頓佔容量最高的前三大資料夾</h3>
+              <p class="text-xs text-[#A3A3A3]">集中處理最肥大的資料層目錄，快速砍掉整批專案備份、原始影片或活動相片封存檔。</p>
+            </div>
+            <button type="button" data-apply-plan="planC" class="btn-secondary text-sm w-full">檢視最大資料層</button>
+          </article>
+        </div>
+
+        <!-- 雙欄排行：大資料層 vs 長期未使用大檔案 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- 左欄：大資料層排行 -->
+          <div class="surface-card-compact space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i class="ph ph-folders text-lg text-[#3B82F6]" aria-hidden="true"></i>
+                <h3 class="text-base font-bold text-white">大資料層（大型資料夾）空間排行</h3>
+              </div>
+              <span class="text-xs text-[#737373]">依合計佔用排序</span>
+            </div>
+
+            <div id="folderRankingList" class="space-y-3">
+              <div class="surface-card-inner text-sm text-[#A3A3A3] py-6 text-center">
+                登入 Google 帳號或進入模擬展示模式後，將自動彙總您的雲端硬碟大資料層排行。
+              </div>
+            </div>
+          </div>
+
+          <!-- 右欄：長期未使用大檔案推薦 -->
+          <div class="surface-card-compact space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i class="ph ph-clock-countdown text-lg text-[#F59E0B]" aria-hidden="true"></i>
+                <h3 class="text-base font-bold text-white">長期沒有使用的大檔案推薦刪除</h3>
+              </div>
+              <span class="text-xs text-[#737373]">容量 × 未開啟天數</span>
+            </div>
+
+            <div id="unusedLargeFilesList" class="space-y-3">
+              <div class="surface-card-inner text-sm text-[#A3A3A3] py-6 text-center">
+                登入 Google 帳號或進入模擬展示模式後，將自動分析您最久未開啟的大型檔案。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         分頁 2：Google 雲端硬碟清理（Drive Cleaner）
+         ==================================================================== -->
+    <section id="tab-drive" data-tab-panel="drive" class="hidden space-y-6">
+      <div class="surface-card space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold text-white">Google 雲端硬碟 — 天數與大檔案清理</h2>
+            <p class="text-sm text-[#A3A3A3] mt-1">支援依照資料天數（修改日期）、檔案體積與類型交叉篩選，批次移至垃圾桶或永久刪除。</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="driveEmptyTrashBtn" class="btn-danger text-sm">
+              <i class="ph ph-fire text-base" aria-hidden="true"></i>
+              <span>一鍵清空雲端硬碟垃圾桶</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 引導式 4 步驟清理工作流 -->
+        <div class="surface-card-inner" aria-label="雲端硬碟清理 4 步驟工作流">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            <div class="surface-card-compact flex items-start gap-3">
+              <span class="w-6 h-6 rounded-md bg-[#272727] border border-[#313131] flex items-center justify-center font-mono-num font-bold text-white shrink-0">1</span>
+              <div class="min-w-0">
+                <div class="font-bold text-white">第 1 步 · 找出最佔空間檔案</div>
+                <p class="text-[#A3A3A3] mt-1">預設已依容量由大到小排序，最上方即為最肥大項目。</p>
+              </div>
+            </div>
+            <div class="surface-card-compact flex items-start gap-3">
+              <span class="w-6 h-6 rounded-md bg-[#272727] border border-[#313131] flex items-center justify-center font-mono-num font-bold text-[#10B981] shrink-0">2</span>
+              <div class="min-w-0">
+                <div class="font-bold text-white">第 2 步 · 點檔名開啟工作流</div>
+                <p class="text-[#A3A3A3] mt-1">選擇「保留檔案只清舊備份」或「直接刪除整份檔案」。</p>
+              </div>
+            </div>
+            <div class="surface-card-compact flex items-start gap-3">
+              <span class="w-6 h-6 rounded-md bg-[#272727] border border-[#313131] flex items-center justify-center font-mono-num font-bold text-white shrink-0">3</span>
+              <div class="min-w-0">
+                <div class="font-bold text-white">第 3 步 · 勾選多筆批次處理</div>
+                <p class="text-[#A3A3A3] mt-1">可先將不確定檔案移至垃圾桶，確認安全再清。</p>
+              </div>
+            </div>
+            <div class="surface-card-compact flex items-start gap-3">
+              <span class="w-6 h-6 rounded-md bg-[#272727] border border-[#313131] flex items-center justify-center font-mono-num font-bold text-[#F59E0B] shrink-0">4</span>
+              <div class="min-w-0">
+                <div class="font-bold text-white">第 4 步 · 清空垃圾桶釋放配額</div>
+                <p class="text-[#A3A3A3] mt-1">移入垃圾桶仍計入容量，點擊右上角紅色按鈕立即釋放。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 篩選條件控制列 -->
+        <div class="surface-card-compact space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div>
+              <label for="driveSizeFilter" class="block text-xs font-semibold text-[#A3A3A3] mb-2">大檔案門檻（容量）</label>
+              <select id="driveSizeFilter" class="field-select">
+                <option value="0" selected>不限大小（全部檔案）</option>
+                <option value="10">10 MB 以上</option>
+                <option value="50">50 MB 以上</option>
+                <option value="100">100 MB 以上（大檔案）</option>
+                <option value="500">500 MB 以上</option>
+                <option value="1024">1 GB 以上</option>
+                <option value="custom">自訂 MB 門檻</option>
+              </select>
+            </div>
+
+            <div id="driveCustomSizeWrap" class="hidden">
+              <label for="driveCustomSizeInput" class="block text-xs font-semibold text-[#A3A3A3] mb-2">自訂大小（MB
+                以上）</label>
+              <input id="driveCustomSizeInput" type="number" min="1" step="1" value="200" class="field-input font-mono">
+            </div>
+
+            <div>
+              <label for="driveDaysFilter" class="block text-xs font-semibold text-[#A3A3A3] mb-2">資料天數（未修改時間）</label>
+              <select id="driveDaysFilter" class="field-select">
+                <option value="0">不限天數</option>
+                <option value="30">超過 30 天</option>
+                <option value="90">超過 90 天</option>
+                <option value="180">超過 180 天（半年）</option>
+                <option value="365">超過 365 天（一年）</option>
+                <option value="730">超過 730 天（兩年）</option>
+                <option value="custom">自訂天數</option>
+              </select>
+            </div>
+
+            <div id="driveCustomDaysWrap" class="hidden">
+              <label for="driveCustomDaysInput"
+                class="block text-xs font-semibold text-[#A3A3A3] mb-2">自訂超過天數（天）</label>
+              <input id="driveCustomDaysInput" type="number" min="1" step="1" value="120" class="field-input font-mono">
+            </div>
+
+            <div>
+              <label for="driveTypeFilter" class="block text-xs font-semibold text-[#A3A3A3] mb-2">檔案類型</label>
+              <select id="driveTypeFilter" class="field-select">
+                <option value="all">全部類型</option>
+                <option value="folder">資料夾（點擊進入檢視內容）</option>
+                <option value="video">影片檔案（MP4、MOV 等）</option>
+                <option value="archive">壓縮封存檔（ZIP、RAR、7Z）</option>
+                <option value="image">圖片與 RAW 相片</option>
+                <option value="document">PDF 與 Office 文件</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="driveScopeFilter" class="block text-xs font-semibold text-[#A3A3A3] mb-2">所在位置</label>
+              <select id="driveScopeFilter" class="field-select">
+                <option value="active">一般檔案（未進入垃圾桶）</option>
+                <option value="trash">僅檢視垃圾桶中檔案</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="driveSortSelect" class="block text-xs font-semibold text-[#A3A3A3] mb-2">排序方式</label>
+              <select id="driveSortSelect" class="field-select">
+                <option value="quotaBytesUsed desc" selected>檔案大小由大到小</option>
+                <option value="quotaBytesUsed asc">檔案大小由小到大</option>
+                <option value="recommend desc">優先建議刪除（容量與未用天數）</option>
+                <option value="modifiedTime asc">修改日由舊到新（最久天數）</option>
+                <option value="modifiedTime desc">修改日由新到舊</option>
+                <option value="unused desc">未使用天數由多到少</option>
+                <option value="unused asc">未使用天數由少到多</option>
+                <option value="name asc">檔案名稱（A 至 Z）</option>
+                <option value="name desc">檔案名稱（Z 至 A）</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label for="driveFolderFilter" class="block text-xs font-semibold text-[#A3A3A3] mb-2">限定大資料層（資料夾）</label>
+              <select id="driveFolderFilter" class="field-select">
+                <option value="all">全部資料層（不限資料夾）</option>
+              </select>
+            </div>
+            <div class="sm:col-span-2 flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+              <div class="flex-1">
+                <label for="driveSearchInput" class="block text-xs font-semibold text-[#A3A3A3] mb-2">檔名關鍵字搜尋</label>
+                <input id="driveSearchInput" type="text" class="field-input" placeholder="輸入檔案名稱關鍵字進行過濾（留空則依上述天數與容量篩選）">
+              </div>
+              <button type="button" id="driveApplyFilterBtn" class="btn-primary shrink-0">
+                <i class="ph ph-funnel text-base" aria-hidden="true"></i>
+                <span>執行篩選查詢</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 重複備份與歷史版本去重偵測面板 -->
+        <div id="duplicateDetectorPanel" class="surface-card-compact flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <i class="ph ph-copy text-lg text-[#F59E0B]" aria-hidden="true"></i>
+              <h3 class="text-sm font-bold text-white">重複備份與同檔多版本清理偵測</h3>
+              <span id="dupSummaryBadge" class="px-2 py-0.5 rounded-md bg-[#272727] border border-[#313131] text-xs font-mono text-[#A3A3A3]">點擊右側按鈕掃描重複副本</span>
+            </div>
+            <p class="text-xs text-[#A3A3A3]">可自動找出「同名／(1) 副本／相同 MD5 內容」的重複備份檔案，或點擊下方任一檔案名稱檢視其內部「歷史版本備份（Revisions）」並清理舊版。</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 shrink-0">
+            <button type="button" id="scanDuplicatesBtn" class="btn-secondary text-xs">
+              <i class="ph ph-magnifying-glass text-sm" aria-hidden="true"></i>
+              <span>掃描重複備份檔案</span>
+            </button>
+            <button type="button" id="selectOldDuplicatesBtn" class="btn-primary text-xs" disabled>
+              <i class="ph ph-check-square text-sm" aria-hidden="true"></i>
+              <span>一鍵勾選多餘舊副本</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 目前瀏覽資料夾導覽列（進入資料夾時顯示） -->
+        <div id="driveFolderNavBar" class="hidden surface-card-inner flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2 text-sm min-w-0">
+            <i class="ph ph-folder-open text-lg text-[#3B82F6] shrink-0" aria-hidden="true"></i>
+            <span class="text-[#A3A3A3] shrink-0">目前資料夾：</span>
+            <strong id="driveCurrentFolderLabel" class="text-white truncate">我的雲端硬碟</strong>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 shrink-0">
+            <a id="driveOpenFolderExternalLink" href="https://drive.google.com" target="_blank" rel="noopener noreferrer" class="btn-secondary text-xs">
+              <i class="ph ph-arrow-square-out text-sm" aria-hidden="true"></i>
+              <span>在 Google Drive 開啟此資料夾</span>
+            </a>
+            <button type="button" id="driveExitFolderBtn" class="btn-secondary text-xs">
+              <i class="ph ph-arrow-u-up-left text-sm" aria-hidden="true"></i>
+              <span>返回全部檔案</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 選取與批次操作列 -->
+        <div class="surface-card-inner flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex flex-wrap items-center gap-4 text-sm">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+              <input id="driveSelectAllCheckbox" type="checkbox" class="w-4 h-4 rounded accent-[#3B82F6]">
+              <span class="font-semibold text-white">全選本頁結果</span>
+            </label>
+            <span class="text-[#A3A3A3]">符合條件：<strong id="driveTotalCount" class="font-mono-num text-white">0</strong>
+              個項目</span>
+            <span class="text-[#A3A3A3]">已選取：<strong id="driveSelectedCount" class="font-mono-num text-white">0</strong>
+              個（預計釋放 <strong id="driveSelectedSize" class="font-mono-num text-[#10B981]">0 B</strong>）</span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="driveBatchTrashBtn" class="btn-secondary text-sm" disabled>
+              <i class="ph ph-trash text-base" aria-hidden="true"></i>
+              <span>移至垃圾桶</span>
+            </button>
+            <button type="button" id="driveBatchDeleteBtn" class="btn-danger text-sm" disabled>
+              <i class="ph ph-x-circle text-base" aria-hidden="true"></i>
+              <span>永久刪除所選</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 檔案清單表格 -->
+        <div class="data-table-wrap">
+          <table class="data-table" aria-label="Google 雲端硬碟檔案清單">
+            <thead>
+              <tr>
+                <th class="w-12">選取</th>
+                <th>
+                  <button type="button" class="th-sort-btn" data-drive-sort-col="name">
+                    <span>檔案名稱與所屬資料層</span>
+                    <i class="ph ph-arrows-down-up text-xs sort-icon" aria-hidden="true"></i>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="th-sort-btn" data-drive-sort-col="size">
+                    <span>檔案大小</span>
+                    <i class="ph ph-arrows-down-up text-xs sort-icon" aria-hidden="true"></i>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="th-sort-btn" data-drive-sort-col="date">
+                    <span>修改／最後檢視日</span>
+                    <i class="ph ph-arrows-down-up text-xs sort-icon" aria-hidden="true"></i>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="th-sort-btn" data-drive-sort-col="unused">
+                    <span>未使用天數</span>
+                    <i class="ph ph-arrows-down-up text-xs sort-icon" aria-hidden="true"></i>
+                  </button>
+                </th>
+                <th class="text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="driveTableBody">
+              <tr>
+                <td colspan="6" class="py-12 text-center text-[#A3A3A3]">
+                  請先於「使用量總覽」登入 Google 帳號，或切換至模擬展示模式以載入雲端硬碟檔案。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="drivePaginationWrap" class="hidden flex items-center justify-between pt-2">
+          <p class="text-xs text-[#A3A3A3]">每頁最多顯示 50 筆符合篩選條件的雲端硬碟項目</p>
+          <button type="button" id="driveLoadMoreBtn" class="btn-secondary text-sm">載入更多檔案</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         分頁 3：Gmail 大信件與附件清理（Gmail Cleaner）
+         ==================================================================== -->
+    <section id="tab-gmail" data-tab-panel="gmail" class="hidden space-y-6">
+      <div class="surface-card space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold text-white">Gmail 信箱 — 大附件與舊信件清理</h2>
+            <p class="text-sm text-[#A3A3A3] mt-1">透過 Gmail 搜尋語法自動鎖定佔用容量的大附件郵件與過期通知，支援批次移至垃圾桶或直接永久清除。</p>
+          </div>
+          <div
+            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#272727] border border-[#313131] text-xs font-mono text-[#A3A3A3]">
+            <span>查詢語法：</span>
+            <code id="gmailQueryPreview" class="text-white">larger:5M older_than:180d</code>
+          </div>
+        </div>
+
+        <!-- Gmail 篩選面板 -->
+        <div class="surface-card-compact space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label for="gmailSizeFilter" class="block text-xs font-semibold text-[#A3A3A3] mb-2">信件與附件大小</label>
+              <select id="gmailSizeFilter" class="field-select">
+                <option value="0">不限大小</option>
+                <option value="1">大於 1 MB</option>
+                <option value="5" selected>大於 5 MB</option>
+                <option value="10">大於 10 MB</option>
+                <option value="20">大於 20 MB</option>
+                <option value="custom">自訂 MB</option>
+              </select>
+            </div>
+
+            <div id="gmailCustomSizeWrap" class="hidden">
+              <label for="gmailCustomSizeInput"
+                class="block text-xs font-semibold text-[#A3A3A3] mb-2">自訂信件大小（MB）</label>
+              <input id="gmailCustomSizeInput" type="number" min="1" step="1" value="8" class="field-input font-mono">
+            </div>
+
+            <div>
+              <label for="gmailDaysFilter" class="block text-xs font-semibold text-[#A3A3A3] mb-2">信件存放天數</label>
+              <select id="gmailDaysFilter" class="field-select">
+                <option value="0">不限天數</option>
+                <option value="30">超過 30 天</option>
+                <option value="90">超過 90 天</option>
+                <option value="180" selected>超過 180 天（半年）</option>
+                <option value="365">超過 365 天（一年）</option>
+                <option value="730">超過 730 天（兩年）</option>
+                <option value="custom">自訂天數</option>
+              </select>
+            </div>
+
+            <div id="gmailCustomDaysWrap" class="hidden">
+              <label for="gmailCustomDaysInput"
+                class="block text-xs font-semibold text-[#A3A3A3] mb-2">自訂信件天數（天）</label>
+              <input id="gmailCustomDaysInput" type="number" min="1" step="1" value="60" class="field-input font-mono">
+            </div>
+
+            <div>
+              <label for="gmailCategoryFilter" class="block text-xs font-semibold text-[#A3A3A3] mb-2">郵件分類與條件</label>
+              <select id="gmailCategoryFilter" class="field-select">
+                <option value="all">全部一般郵件</option>
+                <option value="has:attachment">僅限包含附件（has:attachment）</option>
+                <option value="category:promotions">促銷電子報（Promotions）</option>
+                <option value="category:social">社群平台通知（Social）</option>
+                <option value="category:updates">系統更新與帳單（Updates）</option>
+                <option value="in:trash">僅檢視 Gmail 垃圾桶（in:trash）</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="gmailSortSelect" class="block text-xs font-semibold text-[#A3A3A3] mb-2">清單排序</label>
+              <select id="gmailSortSelect" class="field-select">
+                <option value="sizeDesc">預估容量由大到小</option>
+                <option value="sizeAsc">預估容量由小到大</option>
+                <option value="dateAsc">寄件日期由舊到新</option>
+                <option value="dateDesc">寄件日期由新到舊</option>
+                <option value="subjectAsc">信件主旨（A 至 Z）</option>
+                <option value="subjectDesc">信件主旨（Z 至 A）</option>
+                <option value="fromAsc">寄件者（A 至 Z）</option>
+                <option value="fromDesc">寄件者（Z 至 A）</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <input id="gmailSearchInput" type="text" class="field-input flex-1"
+              placeholder="輸入主旨關鍵字或寄件者信箱（例如：發票、from:newsletter@example.com）">
+            <button type="button" id="gmailApplyFilterBtn" class="btn-primary shrink-0">
+              <i class="ph ph-magnifying-glass text-base" aria-hidden="true"></i>
+              <span>搜尋符合信件</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 選取與批次操作列 -->
+        <div class="surface-card-inner flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex flex-wrap items-center gap-4 text-sm">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+              <input id="gmailSelectAllCheckbox" type="checkbox" class="w-4 h-4 rounded accent-[#3B82F6]">
+              <span class="font-semibold text-white">全選本頁信件</span>
+            </label>
+            <span class="text-[#A3A3A3]">已載入：<strong id="gmailTotalCount" class="font-mono-num text-white">0</strong>
+              封</span>
+            <span class="text-[#A3A3A3]">已選取：<strong id="gmailSelectedCount" class="font-mono-num text-white">0</strong>
+              封（預估釋放 <strong id="gmailSelectedSize" class="font-mono-num text-[#10B981]">0 B</strong>）</span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="gmailBatchTrashBtn" class="btn-secondary text-sm" disabled>
+              <i class="ph ph-trash text-base" aria-hidden="true"></i>
+              <span>移至垃圾桶</span>
+            </button>
+            <button type="button" id="gmailBatchDeleteBtn" class="btn-danger text-sm" disabled>
+              <i class="ph ph-x-circle text-base" aria-hidden="true"></i>
+              <span>批次永久刪除</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Gmail 清單表格 -->
+        <div class="data-table-wrap">
+          <table class="data-table" aria-label="Gmail 信件清單">
+            <thead>
+              <tr>
+                <th class="w-12">選取</th>
+                <th>
+                  <button type="button" class="th-sort-btn" data-gmail-sort-col="subject">
+                    <span>信件主旨與摘要</span>
+                    <i class="ph ph-arrows-down-up text-xs sort-icon" aria-hidden="true"></i>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="th-sort-btn" data-gmail-sort-col="from">
+                    <span>寄件者</span>
+                    <i class="ph ph-arrows-down-up text-xs sort-icon" aria-hidden="true"></i>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="th-sort-btn" data-gmail-sort-col="size">
+                    <span>預估大小</span>
+                    <i class="ph ph-arrows-down-up text-xs sort-icon" aria-hidden="true"></i>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="th-sort-btn" data-gmail-sort-col="date">
+                    <span>收到日期與天數</span>
+                    <i class="ph ph-arrows-down-up text-xs sort-icon" aria-hidden="true"></i>
+                  </button>
+                </th>
+                <th class="text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="gmailTableBody">
+              <tr>
+                <td colspan="6" class="py-12 text-center text-[#A3A3A3]">
+                  請先於「使用量總覽」登入 Google 帳號，或啟動模擬展示模式以檢視 Gmail 大附件郵件。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="gmailPaginationWrap" class="hidden flex items-center justify-between pt-2">
+          <p class="text-xs text-[#A3A3A3]">每次最多載入 40 封郵件進行容量解析</p>
+          <button type="button" id="gmailLoadMoreBtn" class="btn-secondary text-sm">載入更多郵件</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         分頁 4：Google 雲端硬碟與 Gmail 登入操作一步一步教學（Setup Guide）
+         ==================================================================== -->
+    <section id="tab-guide" data-tab-panel="guide" class="hidden space-y-6">
+      <!-- 憑證輸入與一鍵檢測卡片 -->
+      <div class="surface-card space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold text-white">Google 雲端硬碟與 Gmail 登入操作 — 一步一步教學</h2>
+            <p class="text-sm text-[#A3A3A3] mt-1">為了確保您的 Google 帳號密碼與雲端檔案完全掌握在自己手中，本工具不經過中介伺服器，只需 5 分鐘設定您專屬的免費 OAuth
+              2.0 憑證即可登入。</p>
+          </div>
+          <span
+            class="px-3 py-1.5 rounded-lg bg-[#272727] border border-[#313131] text-xs font-semibold text-[#10B981] shrink-0">完全免費且無須信用卡</span>
+        </div>
+
+        <div class="surface-card-compact space-y-3">
+          <label for="guideClientIdInput" class="block text-sm font-semibold text-white">貼上您的 Google OAuth 2.0 Client
+            ID（完成下方步驟 05 後即可在此儲存）</label>
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <input id="guideClientIdInput" type="text" class="field-input font-mono flex-1"
+              placeholder="例如：123456789012-abcde12345.apps.googleusercontent.com">
+            <button type="button" id="guideSaveClientIdBtn" class="btn-secondary shrink-0">儲存 Client ID</button>
+            <button type="button" id="guideLoginNowBtn" class="btn-primary shrink-0">立即登入 Google 帳號</button>
+          </div>
+          <p id="guideClientIdFeedback" class="text-xs text-[#A3A3A3]">提示：Client ID 會安全地儲存在您的本機瀏覽器 <code
+              class="font-mono text-white">localStorage</code> 中，重新整理頁面後不需重複輸入。</p>
+        </div>
+      </div>
+
+      <!-- 六個步驟詳細說明 -->
+      <div class="grid grid-cols-1 gap-4">
+        <!-- 步驟 01 -->
+        <article class="surface-card space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span
+                class="px-3 py-1 rounded-lg bg-[#272727] border border-[#313131] text-xs font-mono font-bold text-white">步驟
+                01</span>
+              <h3 class="text-lg font-bold text-white">透過本地伺服器開啟本網頁（http://localhost:8080）</h3>
+            </div>
+            <i class="ph ph-terminal-window text-2xl text-[#A3A3A3]" aria-hidden="true"></i>
+          </div>
+          <p class="text-sm text-[#A3A3A3]">Google 安全政策禁止從 <code class="font-mono text-white">file://</code> 本機路徑發起
+            OAuth 登入。請在資料夾 <code class="font-mono text-white">c:\AI\google</code> 內雙擊執行 <code
+              class="font-mono text-white">啟動雲端清理工具.bat</code>，或在終端機輸入 <code
+              class="font-mono text-white">python server.py</code>，接著使用瀏覽器開啟下方網址：</p>
+          <div class="surface-card-inner flex items-center justify-between gap-3">
+            <code class="font-mono text-sm text-white">http://localhost:8080</code>
+            <button type="button" class="btn-secondary text-sm copy-snippet-btn"
+              data-copy-text="http://localhost:8080">複製網址</button>
+          </div>
+        </article>
+
+        <!-- 步驟 02 -->
+        <article class="surface-card space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span
+                class="px-3 py-1 rounded-lg bg-[#272727] border border-[#313131] text-xs font-mono font-bold text-white">步驟
+                02</span>
+              <h3 class="text-lg font-bold text-white">前往 Google Cloud Console 建立專案</h3>
+            </div>
+            <i class="ph ph-cloud text-2xl text-[#3B82F6]" aria-hidden="true"></i>
+          </div>
+          <ol class="list-decimal list-inside space-y-2 text-sm text-[#A3A3A3]">
+            <li>打開 <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer"
+                class="text-white underline">Google Cloud Console</a> 並登入您要清理空間的 Google 帳號。</li>
+            <li>點擊頁面上方的「選取專案」下拉選單，接著點擊右上角「新增專案（New Project）」。</li>
+            <li>輸入任意專案名稱（例如：<code class="font-mono text-white">MyDriveCleaner</code>），點擊「建立」並等待右上角通知顯示建立完成後切換至該專案。</li>
+          </ol>
+        </article>
+
+        <!-- 步驟 03 -->
+        <article class="surface-card space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span
+                class="px-3 py-1 rounded-lg bg-[#272727] border border-[#313131] text-xs font-mono font-bold text-white">步驟
+                03</span>
+              <h3 class="text-lg font-bold text-white">同時啟用 Google Drive API 與 Gmail API</h3>
+            </div>
+            <i class="ph ph-plugs-connected text-2xl text-[#10B981]" aria-hidden="true"></i>
+          </div>
+          <p class="text-sm text-[#A3A3A3]">在左側選單選擇「API 和服務」進入「程式庫（Library）」，分別搜尋並啟用下列兩個 API：</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="surface-card-inner space-y-1">
+              <p class="text-sm font-semibold text-white">1. Google Drive API</p>
+              <p class="text-xs text-[#A3A3A3]">負責讀取總容量配額、搜尋大檔案、判斷資料天數，以及移至垃圾桶與永久刪除檔案。</p>
+            </div>
+            <div class="surface-card-inner space-y-1">
+              <p class="text-sm font-semibold text-white">2. Gmail API</p>
+              <p class="text-xs text-[#A3A3A3]">負責依附件大小與寄件天數搜尋信件、預估每封信件容量，以及批次清除舊信件。</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- 步驟 04 -->
+        <article class="surface-card space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span
+                class="px-3 py-1 rounded-lg bg-[#272727] border border-[#313131] text-xs font-mono font-bold text-white">步驟
+                04</span>
+              <h3 class="text-lg font-bold text-white">設定 OAuth 同意畫面與加入「測試使用者」（極重要）</h3>
+            </div>
+            <i class="ph ph-user-check text-2xl text-[#F59E0B]" aria-hidden="true"></i>
+          </div>
+          <ol class="list-decimal list-inside space-y-2 text-sm text-[#A3A3A3]">
+            <li>在左側選單開啟「Google Auth Platform」（或舊版「OAuth 同意畫面」），點擊開始設定。</li>
+            <li>使用者類型選擇「<strong class="text-white">外部（External）</strong>」（一般個人 Gmail 帳號皆選此項；Google Workspace
+              公司帳號可視需求選內部）。</li>
+            <li>填寫應用程式名稱（例如 <code
+                class="font-mono text-white">Drive and Gmail Cleaner</code>）與支援電子郵件（填您自己的信箱），其餘聯絡資訊亦填您的信箱後儲存。</li>
+            <li>前往「<strong class="text-white">目標對象（Audience）</strong>」分頁，在「測試使用者（Test users）」區塊點擊「<strong
+                class="text-white">新增使用者</strong>」，務必將您要登入清理的 Gmail 帳號加入清單。若漏掉這一步，登入時會出現 403 access_denied 錯誤。</li>
+            <li>（選填）若於「資料存取（Data Access / Scopes）」畫面先加入權限，可加入下列兩項完整授權：</li>
+          </ol>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="surface-card-inner flex items-center justify-between gap-2">
+              <code class="font-mono text-xs text-white break-all">https://www.googleapis.com/auth/drive</code>
+              <button type="button" class="btn-secondary text-xs shrink-0 copy-snippet-btn"
+                data-copy-text="https://www.googleapis.com/auth/drive">複製</button>
+            </div>
+            <div class="surface-card-inner flex items-center justify-between gap-2">
+              <code class="font-mono text-xs text-white break-all">https://mail.google.com/</code>
+              <button type="button" class="btn-secondary text-xs shrink-0 copy-snippet-btn"
+                data-copy-text="https://mail.google.com/">複製</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- 步驟 05 -->
+        <article class="surface-card space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span
+                class="px-3 py-1 rounded-lg bg-[#272727] border border-[#313131] text-xs font-mono font-bold text-white">步驟
+                05</span>
+              <h3 class="text-lg font-bold text-white">建立「網頁應用程式」OAuth 用戶端 ID</h3>
+            </div>
+            <i class="ph ph-key text-2xl text-white" aria-hidden="true"></i>
+          </div>
+          <ol class="list-decimal list-inside space-y-2 text-sm text-[#A3A3A3]">
+            <li>在左側點擊「用戶端（Clients）」或「憑證（Credentials）」，點擊「建立用戶端（Create Client）」。</li>
+            <li>應用程式類型務必選擇「<strong class="text-white">網頁應用程式（Web application）</strong>」。</li>
+            <li>在「<strong class="text-white">已授權的 JavaScript 來源（Authorized JavaScript origins）</strong>」點擊「新增
+              URI」，填入下方網址（請注意結尾不可有斜線）：</li>
+          </ol>
+          <div class="surface-card-inner flex items-center justify-between gap-3">
+            <code class="font-mono text-sm text-white">http://localhost:8080</code>
+            <button type="button" class="btn-secondary text-sm copy-snippet-btn"
+              data-copy-text="http://localhost:8080">複製來源網址</button>
+          </div>
+          <p class="text-sm text-[#A3A3A3]">4. 「已授權的重新導向 URI」可留空。點擊建立後，將彈出視窗中的「用戶端編號（Client ID）」複製貼到本頁上方的輸入框並按下「儲存
+            Client ID」。</p>
+        </article>
+
+        <!-- 步驟 06 -->
+        <article class="surface-card space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span
+                class="px-3 py-1 rounded-lg bg-[#272727] border border-[#313131] text-xs font-mono font-bold text-white">步驟
+                06</span>
+              <h3 class="text-lg font-bold text-white">執行 Google 登入與勾選完整存取權限</h3>
+            </div>
+            <i class="ph ph-check-circle text-2xl text-[#10B981]" aria-hidden="true"></i>
+          </div>
+          <ol class="list-decimal list-inside space-y-2 text-sm text-[#A3A3A3]">
+            <li>點擊本頁的「立即登入 Google 帳號」按鈕，選擇您剛剛加入測試使用者的 Gmail 帳號。</li>
+            <li>因為此應用程式是您個人建立且處於測試狀態，Google 會顯示「Google 尚未驗證這個應用程式」警告畫面，請點擊左下角「<strong
+                class="text-white">進階（Advanced）</strong>」，再點擊「<strong class="text-white">前往（應用程式名稱）（不安全）</strong>」。</li>
+            <li>在授權權限畫面中，請務必勾選允許存取「<strong class="text-white">查看、編輯、建立及刪除您所有的 Google 雲端硬碟檔案</strong>」與「<strong
+                class="text-white">讀取、撰寫、傳送及永久刪除 Gmail 中的所有電子郵件</strong>」，最後按下「繼續」即完成登入。</li>
+          </ol>
+        </article>
+      </div>
+
+      <!-- 常見錯誤排解手冊 -->
+      <div class="surface-card space-y-4">
+        <h3 class="text-xl font-bold text-white">常見登入與刪除問題排解</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="surface-card-compact space-y-2">
+            <p class="text-sm font-semibold text-white">問題一：出現 Error 403 access_denied（存取權遭拒）</p>
+            <p class="text-xs text-[#A3A3A3]">原因為您的 Google 帳號尚未加入「測試使用者」清單。請回到 Google Cloud Console
+              的「目標對象（Audience）」分頁，將當前登入的 Gmail 地址新增至 Test users 後重新整理網頁即可。</p>
+          </div>
+          <div class="surface-card-compact space-y-2">
+            <p class="text-sm font-semibold text-white">問題二：出現 Error 400 origin_mismatch</p>
+            <p class="text-xs text-[#A3A3A3]">請檢查瀏覽器網址列是否為 <code
+                class="font-mono text-white">http://localhost:8080</code>（不可混用 127.0.0.1），並確認憑證的「已授權的 JavaScript
+              來源」填入完全相符且沒有結尾斜線。</p>
+          </div>
+          <div class="surface-card-compact space-y-2">
+            <p class="text-sm font-semibold text-white">問題三：Gmail 可以移至垃圾桶但無法「永久刪除」</p>
+            <p class="text-xs text-[#A3A3A3]">Gmail API 的 <code class="font-mono text-white">batchDelete</code> 必須取得完整權限
+              <code class="font-mono text-white">https://mail.google.com/</code>。若登入授權畫面出現未勾選的核取方塊，請登出後重新登入並勾選全部權限項目。
+            </p>
+          </div>
+          <div class="surface-card-compact space-y-2">
+            <p class="text-sm font-semibold text-white">問題四：操作約一小時後出現憑證過期（401）</p>
+            <p class="text-xs text-[#A3A3A3]">瀏覽器端的 Google Access Token 預設有效期限為 3600 秒（一小時）。過期時系統會提示您，只需再次點擊右上角「登入
+              Google」按鈕重新授權即可接續作業。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         強制獨立 Tagline 逐詞顯現區塊（IntersectionObserver 驅動）
+         ==================================================================== -->
+    <section id="taglineRevealSection" class="reveal-section py-20" aria-label="核心設計理念">
+      <div class="surface-card-warm p-8 md:p-12 space-y-4">
+        <p class="text-xs font-semibold text-[#A3A3A3]">LOCAL FIRST STORAGE HYGIENE</p>
+        <div id="taglineWordContainer" class="max-w-[680px] text-4xl md:text-5xl font-bold leading-tight text-white">
+          清理陳年大檔案與歷史信件，讓每一次容量釋放都透明可控，資料全程留在本機瀏覽器。
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 頁尾 -->
+  <footer class="max-w-[1120px] mx-auto px-4 pb-12">
+    <div class="surface-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="space-y-1">
+        <p class="text-sm font-semibold text-white">Google 雲端硬碟與 Gmail 空間清理中心</p>
+        <p class="text-xs text-[#737373]">純靜態前端直連 Google API v3 與 Gmail API v1，不收集或回傳任何使用者權杖與檔案資訊。</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-4 text-xs text-[#A3A3A3]">
+        <button type="button" id="openPrivacyModalBtn"
+          class="bg-transparent border-0 text-[#A3A3A3] hover:text-white cursor-pointer p-0 text-xs">隱私權處理原則</button>
+        <button type="button" id="openTermsModalBtn"
+          class="bg-transparent border-0 text-[#A3A3A3] hover:text-white cursor-pointer p-0 text-xs">安全刪除條款</button>
+        <button type="button" data-nav-target="guide"
+          class="bg-transparent border-0 text-[#A3A3A3] hover:text-white cursor-pointer p-0 text-xs">設定與常見問題</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 自訂確認刪除對話框（Modal） -->
+  <div id="confirmModalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true"
+    aria-labelledby="confirmModalTitle" aria-hidden="true">
+    <div class="modal-panel space-y-6">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <span id="confirmModalIconWrap"
+            class="w-10 h-10 rounded-lg bg-[#3B1212] border border-[#7F1D1D] flex items-center justify-center shrink-0">
+            <i id="confirmModalIcon" class="ph ph-warning text-xl text-[#FCA5A5]" aria-hidden="true"></i>
+          </span>
+          <div>
+            <h3 id="confirmModalTitle" class="text-lg font-bold text-white">確認執行刪除作業</h3>
+            <p id="confirmModalSubtitle" class="text-xs text-[#A3A3A3] mt-1">請確認以下項目明細</p>
+          </div>
+        </div>
+        <button type="button" id="confirmModalCloseBtn"
+          class="text-[#A3A3A3] hover:text-white bg-transparent border-0 cursor-pointer p-1" aria-label="關閉對話框">
+          <i class="ph ph-x text-lg" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <div id="confirmModalBody" class="surface-card-compact space-y-2 text-sm text-[#A3A3A3]">
+        <!-- 動態填入確認內容 -->
+      </div>
+
+      <div id="confirmProgressWrap" class="hidden space-y-2">
+        <div class="flex items-center justify-between text-xs">
+          <span id="confirmProgressLabel" class="text-[#A3A3A3]">正在執行 API 刪除作業</span>
+          <span id="confirmProgressCount" class="font-mono-num text-white">0 / 0</span>
+        </div>
+        <div class="quota-bar-track">
+          <div id="confirmProgressBar" class="quota-segment bg-[#10B981]" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3">
+        <button type="button" id="confirmModalCancelBtn" class="btn-secondary">取消操作</button>
+        <button type="button" id="confirmModalExecuteBtn" class="btn-danger">確認執行</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 隱私與安全條款說明對話框 -->
+  <div id="infoModalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle"
+    aria-hidden="true">
+    <div class="modal-panel space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 id="infoModalTitle" class="text-lg font-bold text-white">系統說明</h3>
+        <button type="button" id="infoModalCloseBtn"
+          class="text-[#A3A3A3] hover:text-white bg-transparent border-0 cursor-pointer p-1" aria-label="關閉說明">
+          <i class="ph ph-x text-lg" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="infoModalContent" class="text-sm text-[#A3A3A3] space-y-3"></div>
+      <div class="flex justify-end pt-2">
+        <button type="button" id="infoModalConfirmBtn" class="btn-secondary">我知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 檔案內容預覽與 3 步驟清理工作流對話框 -->
+  <div id="filePreviewModalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true"
+    aria-labelledby="previewModalTitle" aria-hidden="true">
+    <div class="preview-modal-panel space-y-4">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="w-10 h-10 rounded-lg bg-[#272727] border border-[#313131] flex items-center justify-center shrink-0">
+            <i id="previewModalIcon" class="ph ph-file text-xl text-white" aria-hidden="true"></i>
+          </span>
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-[#272727] border border-[#313131] text-xs font-semibold text-[#10B981]">檔案處理工作流</span>
+              <h3 id="previewModalTitle" class="text-lg font-bold text-white truncate">檔案內容檢視</h3>
+            </div>
+            <p id="previewModalSubtitle" class="text-xs text-[#A3A3A3] mt-1 truncate">依循 步驟 1 確認內容 → 步驟 2 選擇處理路線 → 步驟 3 查看執行結果</p>
+          </div>
+        </div>
+        <button type="button" id="previewModalCloseBtn"
+          class="text-[#A3A3A3] hover:text-white bg-transparent border-0 cursor-pointer p-1 shrink-0" aria-label="關閉預覽視窗">
+          <i class="ph ph-x text-lg" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        <!-- 步驟 1：確認檔案內容與容量診斷 -->
+        <div class="lg:col-span-5 space-y-3">
+          <div class="surface-card-compact space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold text-white">步驟 1 · 確認檔案內容與容量診斷</span>
+              <span class="px-2 py-0.5 rounded-md bg-[#181818] border border-[#313131] text-xs font-mono-num text-[#A3A3A3]">Step 1</span>
+            </div>
+
+            <div id="previewFrameContainer" class="preview-iframe-wrap" style="min-height: 220px; height: 220px;">
+              <p class="text-sm text-[#A3A3A3]">正在載入預覽畫面</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <a id="previewOpenDriveBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn-primary text-xs">
+                <i class="ph ph-arrow-square-out text-sm" aria-hidden="true"></i>
+                <span>Google Drive 開啟原檔</span>
+              </a>
+              <button type="button" id="previewEnterFolderBtn" class="btn-secondary text-xs">
+                <i class="ph ph-folder-open text-sm" aria-hidden="true"></i>
+                <span>進入所屬資料夾</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="surface-card-compact space-y-2 text-xs">
+            <h4 class="text-sm font-bold text-white mb-2">檔案容量與屬性明細</h4>
+            <div class="flex justify-between gap-2"><span class="text-[#A3A3A3]">總佔用配額（含舊版）</span><strong id="previewQuotaSize" class="font-mono-num text-white">—</strong></div>
+            <div class="flex justify-between gap-2"><span class="text-[#A3A3A3]">最新版單檔大小</span><span id="previewLatestSize" class="font-mono-num text-[#A3A3A3]">—</span></div>
+            <div class="flex justify-between gap-2"><span class="text-[#A3A3A3]">所屬資料層</span><span id="previewFolderName" class="text-white truncate">—</span></div>
+            <div class="flex justify-between gap-2"><span class="text-[#A3A3A3]">建立日期</span><span id="previewCreatedTime" class="font-mono-num text-[#A3A3A3]">—</span></div>
+            <div class="flex justify-between gap-2"><span class="text-[#A3A3A3]">最後修改／檢視</span><span id="previewModifiedTime" class="font-mono-num text-[#A3A3A3]">—</span></div>
+            <div id="previewWorkflowDiagnosis" class="surface-card-inner mt-2 text-xs text-[#A3A3A3]">
+              正在計算最新版與歷史舊備份所佔用的空間比例…
+            </div>
+          </div>
+        </div>
+
+        <!-- 步驟 2（二選一路線）＋ 步驟 3（即時狀態報告） -->
+        <div class="lg:col-span-7 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-white">步驟 2 · 選擇您的處理路線（請依需求二選一）</span>
+            <span class="px-2 py-0.5 rounded-md bg-[#272727] border border-[#313131] text-xs font-mono-num text-[#10B981]">Step 2</span>
+          </div>
+
+          <!-- 路線 A：保留檔案，只清除舊歷史備份（瘦身） -->
+          <div class="surface-card-compact space-y-3" style="border-color: #065F46; background-color: #14221C;">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-md bg-[#064E3B] border border-[#059669] text-xs font-bold text-[#6EE7B7]">路線 A · 推薦</span>
+                  <h4 class="text-sm font-bold text-white">保留檔案，只清除佔空間的舊歷史備份</h4>
+                </div>
+                <p class="text-xs text-[#A3A3A3] mt-1">適用於仍需保留最新檔內容，但不想讓幾十個舊版備份吃光空間的情況。</p>
+              </div>
+              <span id="previewRevisionCountBadge" class="px-2 py-0.5 rounded-md bg-[#272727] border border-[#313131] text-xs font-mono-num text-[#A3A3A3]">檢查中</span>
+            </div>
+
+            <!-- 方法 A1：自動重建乾淨版 -->
+            <div class="surface-card-inner space-y-2">
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <strong class="text-[#6EE7B7]">方法 A1 · 自動重建最新乾淨版（最可靠，可繞過 Google 鎖定）</strong>
+              </div>
+              <p class="text-xs text-[#A3A3A3]">先建立一份「僅含最新版、無任何歷史舊版」的新複本，再把原本肥大舊檔移入垃圾桶，徹底解決無法逐筆刪除舊版的問題。</p>
+              <button type="button" id="previewRebuildCleanBtn" class="btn-success text-xs w-full" disabled>
+                <i class="ph ph-sparkle text-sm" aria-hidden="true"></i>
+                <span>自動重建最新乾淨版（保留最新版 ＋ 舊肥大檔移至垃圾桶）</span>
+              </button>
+            </div>
+
+            <!-- 方法 A2：嘗試逐筆刪除舊版本 -->
+            <div class="surface-card-inner space-y-2">
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <strong class="text-white">方法 A2 · 嘗試就地逐筆刪除舊歷史版本</strong>
+                <span class="text-[#737373]">部分二進位檔可能遭 Google 鎖定</span>
+              </div>
+              <div id="previewRevisionsList" class="space-y-2 max-h-32 overflow-y-auto text-xs">
+                <p class="text-[#A3A3A3]">正在讀取此檔案的歷史版本紀錄</p>
+              </div>
+              <button type="button" id="previewCleanOldRevisionsBtn" class="btn-secondary text-xs w-full" disabled>
+                <i class="ph ph-broom text-sm" aria-hidden="true"></i>
+                <span>逐筆刪除舊歷史版本（僅保留最新版）</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 路線 B：整份檔案都不要了（刪除整個檔案，含最新版） -->
+          <div class="surface-card-compact space-y-3" style="border-color: #7F1D1D; background-color: #211515;">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-md bg-[#451A1A] border border-[#991B1B] text-xs font-bold text-[#FCA5A5]">路線 B · 刪除整份檔案</span>
+                  <h4 class="text-sm font-bold text-white">整份檔案都不需要了（連同最新版一併移除）</h4>
+                </div>
+                <p class="text-xs text-[#A3A3A3] mt-1">請注意：以下兩顆按鈕會刪除「整份檔案」，而不只是舊版本！不確定建議先移至垃圾桶。</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button type="button" id="previewTrashFileBtn" class="btn-secondary text-xs w-full">
+                <i class="ph ph-trash text-sm" aria-hidden="true"></i>
+                <span>將整份檔案移至垃圾桶（可救回）</span>
+              </button>
+              <button type="button" id="previewDeleteFileBtn" class="btn-danger text-xs w-full">
+                <i class="ph ph-warning-octagon text-sm" aria-hidden="true"></i>
+                <span>永久刪除整份檔案（立即釋放）</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 步驟 3：即時執行狀態與錯誤原因回報 -->
+          <div id="previewRevisionStatusBox" class="hidden surface-card-compact space-y-2 text-xs">
+            <div class="flex items-center justify-between gap-2">
+              <span id="previewRevStatusText" class="text-white font-semibold">步驟 3 · 正在執行作業</span>
+              <span id="previewRevProgressCount" class="font-mono-num text-[#A3A3A3]">0 / 0</span>
+            </div>
+            <div class="quota-bar-track" style="height: 10px;">
+              <div id="previewRevProgressBar" class="quota-segment bg-[#10B981]" style="width: 0%;"></div>
+            </div>
+            <div id="previewRevErrorDetail" class="hidden text-xs text-[#FCA5A5] leading-relaxed"></div>
+            <button type="button" id="previewReauthBtn" class="hidden btn-primary text-xs w-full">
+              <i class="ph ph-key text-sm" aria-hidden="true"></i>
+              <span>重新授權 Google 帳號（請務必全選雲端硬碟編輯與刪除權限）</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
