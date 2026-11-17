@@ -61,7 +61,12 @@
       items: [],
       selectedIds: new Set(),
       nextPageToken: null,
-      loading: false
+      loading: false,
+      activeSubtab: 'cleaner',
+      viewMode: 'grouped',
+      collapsedSenders: new Set(),
+      subscriptions: [],
+      subsLoading: false
     },
     demoStore: {
       quotaLimit: 15 * 1024 * 1024 * 1024,
@@ -313,6 +318,17 @@
         snippet: '您好，附上本季印刷完稿 PDF 與向量圖檔連結，請查收確認版面。'
       },
       {
+        id: 'demo_gm_01_b',
+        subject: '2025 新版品牌識別規範手冊初稿（附高解析檔案）',
+        from: '林怡君設計工作室 <studio@example.tw>',
+        internalDate: now - 120 * dayMs,
+        sizeEstimate: 16.2 * 1048576,
+        hasAttachment: true,
+        category: 'updates',
+        inTrash: false,
+        snippet: '已完成色彩定義與標準字設計規範，請參閱隨信附件草案。'
+      },
+      {
         id: 'demo_gm_02',
         subject: '台北國際電腦展參展影片花絮原始檔傳送',
         from: '陳志豪 <zhihao.chen@media-partner.tw>',
@@ -333,6 +349,17 @@
         category: 'updates',
         inTrash: false,
         snippet: '隨信檢附貴司本年度續約合約書及完整分期對帳明細表。'
+      },
+      {
+        id: 'demo_gm_03_b',
+        subject: '雲端主機資源用量即時警報與月結帳單',
+        from: 'CloudBilling Taiwan <billing@cloudvendor.example>',
+        internalDate: now - 45 * dayMs,
+        sizeEstimate: 5.2 * 1048576,
+        hasAttachment: true,
+        category: 'updates',
+        inTrash: false,
+        snippet: '系統偵測到上月儲存空間用量即將達到預警上限，請確認月結清單。'
       },
       {
         id: 'demo_gm_04',
@@ -365,7 +392,27 @@
         hasAttachment: false,
         category: 'promotions',
         inTrash: false,
-        snippet: '精選超過五十組字體樣本與網頁排版指南電子書預覽。'
+        snippet: '精選超過五十組字體樣本與網頁排版指南電子書預覽。',
+        unsubInfo: {
+          httpUrl: 'https://creativehub.example/unsubscribe?id=demo_user',
+          mailtoUrl: 'mailto:unsub@creativehub.example?subject=unsubscribe',
+          type: 'web'
+        }
+      },
+      {
+        id: 'demo_gm_06_b',
+        subject: '【黑五特惠】頂級向量字型庫終身買斷促銷通知',
+        from: 'Creative Hub Weekly <digest@creativehub.example>',
+        internalDate: now - 60 * dayMs,
+        sizeEstimate: 7.1 * 1048576,
+        hasAttachment: false,
+        category: 'promotions',
+        inTrash: false,
+        snippet: '限時三折特惠即將結束，立即解鎖全站百萬套商用素材授權。',
+        unsubInfo: {
+          httpUrl: 'https://creativehub.example/unsubscribe?id=demo_user',
+          type: 'web'
+        }
       },
       {
         id: 'demo_gm_07',
@@ -376,7 +423,26 @@
         hasAttachment: false,
         category: 'social',
         inTrash: false,
-        snippet: '您追蹤的議題本週新增四十二則回覆與完整測試報告。'
+        snippet: '您追蹤的議題本週新增四十二則回覆與完整測試報告。',
+        unsubInfo: {
+          mailtoUrl: 'mailto:unsub@techforum.example?subject=unsubscribe_user',
+          type: 'mail'
+        }
+      },
+      {
+        id: 'demo_gm_07_b',
+        subject: 'TechForum 每週精選：前端框架效能調校指南',
+        from: 'TechForum Digest <no-reply@techforum.example>',
+        internalDate: now - 180 * dayMs,
+        sizeEstimate: 4.8 * 1048576,
+        hasAttachment: false,
+        category: 'social',
+        inTrash: false,
+        snippet: '本週社群熱門討論文章彙整，包含伺服器渲染最佳化實戰技巧。',
+        unsubInfo: {
+          mailtoUrl: 'mailto:unsub@techforum.example?subject=unsubscribe_user',
+          type: 'mail'
+        }
       },
       {
         id: 'demo_gm_08',
@@ -388,6 +454,66 @@
         category: 'updates',
         inTrash: true,
         snippet: '自動排程已完成資料表匯出與壓縮封存，請確認保留期限。'
+      },
+      {
+        id: 'demo_gm_09',
+        subject: 'Shopee 蝦皮購物：週末全站免運券與狂歡優惠已入帳',
+        from: 'Shopee 蝦皮購物 <promotions@shopee.tw>',
+        internalDate: now - 35 * dayMs,
+        sizeEstimate: 5.9 * 1048576,
+        hasAttachment: false,
+        category: 'promotions',
+        inTrash: false,
+        snippet: '您專屬的免運折扣券已發送至帳戶，立即前往搶購指定熱門商品。',
+        unsubInfo: {
+          httpUrl: 'https://shopee.tw/unsubscribe?token=demo_token_123',
+          type: 'web'
+        }
+      },
+      {
+        id: 'demo_gm_09_b',
+        subject: 'Shopee 蝦皮購物：您購物車內的商品即將降價！',
+        from: 'Shopee 蝦皮購物 <promotions@shopee.tw>',
+        internalDate: now - 14 * dayMs,
+        sizeEstimate: 4.5 * 1048576,
+        hasAttachment: false,
+        category: 'promotions',
+        inTrash: false,
+        snippet: '關注商品限時降價中，滿額再享超商取貨免運費優惠。',
+        unsubInfo: {
+          httpUrl: 'https://shopee.tw/unsubscribe?token=demo_token_123',
+          type: 'web'
+        }
+      },
+      {
+        id: 'demo_gm_10',
+        subject: 'Uber & Uber Eats：專屬乘車折抵金與美味外送推薦',
+        from: 'Uber Taiwan <support@uber.com>',
+        internalDate: now - 52 * dayMs,
+        sizeEstimate: 4.8 * 1048576,
+        hasAttachment: false,
+        category: 'promotions',
+        inTrash: false,
+        snippet: '這週末搭車輸入專屬優惠序號即可享 85 折優惠，隨點隨叫美味到家。',
+        unsubInfo: {
+          httpUrl: 'https://mail.uber.com/unsub?id=demo_uber_sub',
+          type: 'web'
+        }
+      },
+      {
+        id: 'demo_gm_11',
+        subject: 'GitHub Notifications：New releases and repository updates',
+        from: 'GitHub <notifications@github.com>',
+        internalDate: now - 85 * dayMs,
+        sizeEstimate: 6.2 * 1048576,
+        hasAttachment: false,
+        category: 'social',
+        inTrash: false,
+        snippet: 'You have 12 unread notifications for repositories you watch.',
+        unsubInfo: {
+          httpUrl: 'https://github.com/settings/notifications',
+          type: 'web'
+        }
       }
     ];
 
@@ -532,6 +658,23 @@
     gmailSelectedSize: document.getElementById('gmailSelectedSize'),
     gmailBatchTrashBtn: document.getElementById('gmailBatchTrashBtn'),
     gmailBatchDeleteBtn: document.getElementById('gmailBatchDeleteBtn'),
+    gmailSubtabCleanerBtn: document.getElementById('gmailSubtabCleanerBtn'),
+    gmailSubtabSubscriptionsBtn: document.getElementById('gmailSubtabSubscriptionsBtn'),
+    gmailCleanerPanel: document.getElementById('gmailCleanerPanel'),
+    gmailSubscriptionsPanel: document.getElementById('gmailSubscriptionsPanel'),
+    gmailViewModeGroupedBtn: document.getElementById('gmailViewModeGroupedBtn'),
+    gmailViewModeFlatBtn: document.getElementById('gmailViewModeFlatBtn'),
+    gmailExpandAllBtn: document.getElementById('gmailExpandAllBtn'),
+    gmailCollapseAllBtn: document.getElementById('gmailCollapseAllBtn'),
+    gmailGroupedWrap: document.getElementById('gmailGroupedWrap'),
+    gmailGroupedContainer: document.getElementById('gmailGroupedContainer'),
+    gmailFlatWrap: document.getElementById('gmailFlatWrap'),
+    subScanBtn: document.getElementById('subScanBtn'),
+    subStatsTotalCount: document.getElementById('subStatsTotalCount'),
+    subStatsMessageCount: document.getElementById('subStatsMessageCount'),
+    subStatsTotalBytes: document.getElementById('subStatsTotalBytes'),
+    subStatsUnsubCount: document.getElementById('subStatsUnsubCount'),
+    subTableBody: document.getElementById('subTableBody'),
     gmailTableBody: document.getElementById('gmailTableBody'),
     gmailPaginationWrap: document.getElementById('gmailPaginationWrap'),
     gmailLoadMoreBtn: document.getElementById('gmailLoadMoreBtn'),
@@ -2790,13 +2933,14 @@
         const refs = listData.messages || [];
 
         const detailed = await runWithConcurrency(refs, 8, async (ref) => {
-          const detailUrl = `${GMAIL_API_BASE}/messages/${encodeURIComponent(ref.id)}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`;
+          const detailUrl = `${GMAIL_API_BASE}/messages/${encodeURIComponent(ref.id)}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post`;
           const msg = await googleApiFetch(detailUrl);
           const headers = msg.payload?.headers || [];
           const getHeader = (name) => {
             const found = headers.find((h) => h.name.toLowerCase() === name.toLowerCase());
             return found ? found.value : '';
           };
+          const rawUnsub = getHeader('List-Unsubscribe');
           return {
             id: msg.id,
             subject: getHeader('Subject') || '（無主旨信件）',
@@ -2804,7 +2948,8 @@
             internalDate: Number(msg.internalDate || Date.now()),
             sizeEstimate: Number(msg.sizeEstimate || 0),
             inTrash: Array.isArray(msg.labelIds) && msg.labelIds.includes('TRASH'),
-            snippet: msg.snippet || ''
+            snippet: msg.snippet || '',
+            unsubInfo: parseUnsubscribeHeader(rawUnsub)
           };
         });
 
@@ -2819,6 +2964,517 @@
       state.gmail.loading = false;
       renderGmailTable();
     }
+  }
+
+  function parseUnsubscribeHeader(headerVal) {
+    if (!headerVal || typeof headerVal !== 'string') return null;
+    let httpUrl = null;
+    let mailtoUrl = null;
+    const items = headerVal.match(/<([^>]+)>/g) || [headerVal];
+    for (const item of items) {
+      const clean = item.replace(/[<>]/g, '').trim();
+      if (/^https?:\/\//i.test(clean) && !httpUrl) {
+        httpUrl = clean;
+      } else if (/^mailto:/i.test(clean) && !mailtoUrl) {
+        mailtoUrl = clean;
+      }
+    }
+    if (!httpUrl && !mailtoUrl) return null;
+    return {
+      httpUrl,
+      mailtoUrl,
+      type: httpUrl ? 'web' : 'mail'
+    };
+  }
+
+  function parseSender(fromStr) {
+    const raw = String(fromStr || '').trim();
+    if (!raw) return { name: '未知寄件者', email: '' };
+    const match = raw.match(/^(.*?)(?:<([^>]+)>)?$/);
+    if (match) {
+      const name = (match[1] || '').replace(/['"]/g, '').trim();
+      const email = (match[2] || '').trim();
+      if (email) {
+        return { name: name || email.split('@')[0], email };
+      }
+      if (raw.includes('@')) {
+        return { name: raw.split('@')[0], email: raw };
+      }
+      return { name: raw, email: '' };
+    }
+    return { name: raw, email: '' };
+  }
+
+  function groupGmailBySender(items) {
+    const map = new Map();
+    for (const msg of items) {
+      const sender = parseSender(msg.from);
+      const key = (sender.email || sender.name || 'unknown').toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          name: sender.name,
+          email: sender.email,
+          messages: [],
+          totalBytes: 0,
+          latestDate: 0,
+          unsubInfo: msg.unsubInfo || null
+        });
+      }
+      const g = map.get(key);
+      g.messages.push(msg);
+      g.totalBytes += Number(msg.sizeEstimate || 0);
+      if (msg.internalDate > g.latestDate) {
+        g.latestDate = msg.internalDate;
+      }
+      if (!g.unsubInfo && msg.unsubInfo) {
+        g.unsubInfo = msg.unsubInfo;
+      }
+    }
+
+    const groups = Array.from(map.values());
+    const sortVal = el.gmailSortSelect.value;
+    groups.sort((a, b) => {
+      if (sortVal === 'sizeAsc') return a.totalBytes - b.totalBytes;
+      if (sortVal === 'dateAsc') return a.latestDate - b.latestDate;
+      if (sortVal === 'dateDesc') return b.latestDate - a.latestDate;
+      if (sortVal === 'fromAsc') return a.name.localeCompare(b.name, 'zh-Hant');
+      if (sortVal === 'fromDesc') return b.name.localeCompare(a.name, 'zh-Hant');
+      return b.totalBytes - a.totalBytes;
+    });
+
+    return groups;
+  }
+
+  function renderGmailTable() {
+    if (state.gmail.activeSubtab === 'subscriptions') {
+      return;
+    }
+
+    if (state.mode === 'guest') {
+      const guestHtml = `
+        <div class="surface-card-compact py-12 text-center">
+          <div class="space-y-3 max-w-md mx-auto">
+            <p class="text-base font-semibold text-white">尚未載入 Gmail 郵件清單</p>
+            <p class="text-sm text-[#A3A3A3]">請返回「使用量總覽」登入 Google 帳號並授權 Gmail 權限，或啟動模擬展示模式體驗。</p>
+          </div>
+        </div>
+      `;
+      el.gmailGroupedContainer.innerHTML = guestHtml;
+      el.gmailTableBody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-[#A3A3A3]">尚未載入 Gmail 郵件清單</td></tr>`;
+      el.gmailPaginationWrap.classList.add('hidden');
+      updateGmailSelectionStats();
+      return;
+    }
+
+    if (state.gmail.items.length === 0) {
+      const emptyHtml = `
+        <div class="surface-card-compact py-12 text-center">
+          <div class="space-y-2 max-w-md mx-auto">
+            <p class="text-base font-semibold text-white">沒有符合此查詢條件的 Gmail 信件</p>
+            <p class="text-sm text-[#A3A3A3]">建議調降 MB 門檻或縮短存放天數後再點擊「搜尋符合信件」。</p>
+          </div>
+        </div>
+      `;
+      el.gmailGroupedContainer.innerHTML = emptyHtml;
+      el.gmailTableBody.innerHTML = `<tr><td colspan="6" class="py-12 text-center text-[#A3A3A3]">沒有符合條件的信件</td></tr>`;
+      el.gmailPaginationWrap.classList.add('hidden');
+      updateGmailSelectionStats();
+      return;
+    }
+
+    if (state.gmail.viewMode === 'grouped') {
+      el.gmailGroupedWrap.classList.remove('hidden');
+      el.gmailFlatWrap.classList.add('hidden');
+      renderGmailGroupedTable();
+    } else {
+      el.gmailGroupedWrap.classList.add('hidden');
+      el.gmailFlatWrap.classList.remove('hidden');
+      renderGmailFlatTable();
+    }
+
+    if (state.gmail.nextPageToken) {
+      el.gmailPaginationWrap.classList.remove('hidden');
+    } else {
+      el.gmailPaginationWrap.classList.add('hidden');
+    }
+
+    updateGmailSelectionStats();
+  }
+
+  function renderGmailGroupedTable() {
+    const groups = groupGmailBySender(state.gmail.items);
+    const isTrashScope = el.gmailCategoryFilter.value === 'in:trash';
+
+    el.gmailGroupedContainer.innerHTML = groups.map((g, idx) => {
+      // 預設前 3 個大群組自動展開，其餘依照使用者記錄收合
+      const isExpanded = !state.gmail.collapsedSenders.has(g.key);
+      const allChecked = g.messages.length > 0 && g.messages.every((m) => state.gmail.selectedIds.has(m.id));
+      const someChecked = !allChecked && g.messages.some((m) => state.gmail.selectedIds.has(m.id));
+
+      const itemsHtml = g.messages.map((msg) => {
+        const checked = state.gmail.selectedIds.has(msg.id);
+        const daysAgo = calcDaysAgo(msg.internalDate);
+        const ageBadgeClass = daysAgo >= 365
+          ? 'bg-[#3B1212] border-[#7F1D1D] text-[#FCA5A5]'
+          : daysAgo >= 180
+            ? 'bg-[#451A03] border-[#78350F] text-[#FCD34D]'
+            : 'bg-[#272727] border-[#313131] text-[#A3A3A3]';
+
+        return `
+          <div class="sender-group-item ${checked ? 'is-selected' : ''}">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <input type="checkbox" class="gmail-row-checkbox w-4 h-4 rounded accent-[#3B82F6] cursor-pointer shrink-0"
+                data-id="${escapeHtml(msg.id)}" ${checked ? 'checked' : ''} aria-label="選取信件 ${escapeHtml(msg.subject)}">
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-semibold text-white truncate text-sm" title="${escapeHtml(msg.subject)}">${escapeHtml(msg.subject)}</span>
+                  ${msg.unsubInfo ? `<span class="unsub-badge-web text-[10px] py-0 px-1.5"><i class="ph ph-bell-slash"></i>可退訂</span>` : ''}
+                </div>
+                <p class="text-xs text-[#737373] truncate mt-0.5">${escapeHtml(msg.snippet)}</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-4 shrink-0 text-xs">
+              <span class="font-mono-num font-semibold text-white whitespace-nowrap">${formatBytes(msg.sizeEstimate)}</span>
+              <div class="flex items-center gap-1.5 whitespace-nowrap">
+                <span class="font-mono-num text-[#A3A3A3]">${formatDateDisplay(msg.internalDate)}</span>
+                <span class="px-1.5 py-0.5 rounded border font-mono-num ${ageBadgeClass}">${daysAgo} 天</span>
+              </div>
+              <div class="inline-flex items-center gap-1.5">
+                ${!isTrashScope ? `<button type="button" class="btn-secondary text-xs p-1.5 gmail-single-trash-btn" data-id="${escapeHtml(msg.id)}" title="移至垃圾桶"><i class="ph ph-trash" aria-hidden="true"></i></button>` : ''}
+                <button type="button" class="btn-danger text-xs p-1.5 gmail-single-delete-btn" data-id="${escapeHtml(msg.id)}" title="永久刪除"><i class="ph ph-x-circle" aria-hidden="true"></i></button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="sender-group-card ${isExpanded ? 'is-expanded' : ''}" data-sender-key="${escapeHtml(g.key)}">
+          <div class="sender-group-header">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <span class="sender-group-arrow">
+                <i class="ph ph-caret-right text-base" aria-hidden="true"></i>
+              </span>
+              <input type="checkbox" class="sender-group-select-checkbox w-4 h-4 rounded accent-[#3B82F6] cursor-pointer shrink-0"
+                data-sender-key="${escapeHtml(g.key)}" ${allChecked ? 'checked' : ''} aria-label="全選寄件者 ${escapeHtml(g.name)} 的信件">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <strong class="text-white text-sm truncate">${escapeHtml(g.name)}</strong>
+                  ${g.email ? `<span class="text-xs text-[#A3A3A3] truncate font-mono">&lt;${escapeHtml(g.email)}&gt;</span>` : ''}
+                  <span class="px-2 py-0.5 rounded-md bg-[#272727] border border-[#313131] text-xs font-mono-num text-white">${g.messages.length} 封信件</span>
+                  <span class="px-2 py-0.5 rounded-md bg-[#064E3B] border border-[#059669] text-xs font-mono-num text-[#6EE7B7]">${formatBytes(g.totalBytes)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-xs text-[#737373] hidden sm:inline-block font-mono-num">最新：${formatDateDisplay(g.latestDate)}</span>
+              ${g.unsubInfo ? `
+                <button type="button" class="btn-secondary text-xs sub-quick-unsub-btn" data-sender-key="${escapeHtml(g.key)}" title="點擊取消訂閱此電子報">
+                  <i class="ph ph-bell-slash text-xs" aria-hidden="true"></i>
+                  <span>退訂</span>
+                </button>
+              ` : ''}
+              ${!isTrashScope ? `
+                <button type="button" class="btn-secondary text-xs sender-group-trash-btn" data-sender-key="${escapeHtml(g.key)}" title="將此寄件者的全部信件移入垃圾桶">
+                  <i class="ph ph-trash text-xs" aria-hidden="true"></i>
+                  <span>清入垃圾桶</span>
+                </button>
+              ` : ''}
+              <button type="button" class="btn-danger text-xs sender-group-delete-btn" data-sender-key="${escapeHtml(g.key)}" title="永久刪除此寄件者所有信件">
+                <i class="ph ph-x-circle text-xs" aria-hidden="true"></i>
+                <span>清空刪除</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="sender-group-content">
+            ${itemsHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderGmailFlatTable() {
+    const isTrashScope = el.gmailCategoryFilter.value === 'in:trash';
+
+    el.gmailTableBody.innerHTML = state.gmail.items.map((msg) => {
+      const checked = state.gmail.selectedIds.has(msg.id);
+      const daysAgo = calcDaysAgo(msg.internalDate);
+      const ageBadgeClass = daysAgo >= 365
+        ? 'bg-[#3B1212] border-[#7F1D1D] text-[#FCA5A5]'
+        : daysAgo >= 180
+          ? 'bg-[#451A03] border-[#78350F] text-[#FCD34D]'
+          : 'bg-[#272727] border-[#313131] text-[#A3A3A3]';
+
+      return `
+        <tr class="${checked ? 'is-selected' : ''}">
+          <td>
+            <input type="checkbox" class="gmail-row-checkbox w-4 h-4 rounded accent-[#3B82F6] cursor-pointer" data-id="${escapeHtml(msg.id)}" ${checked ? 'checked' : ''} aria-label="選取信件 ${escapeHtml(msg.subject)}">
+          </td>
+          <td>
+            <div class="min-w-[220px] max-w-[360px]">
+              <div class="flex items-center gap-2">
+                <p class="font-semibold text-white truncate" title="${escapeHtml(msg.subject)}">${escapeHtml(msg.subject)}</p>
+                ${msg.unsubInfo ? `<span class="unsub-badge-web text-[10px] py-0 px-1.5"><i class="ph ph-bell-slash"></i>可退訂</span>` : ''}
+              </div>
+              <p class="text-xs text-[#737373] truncate mt-0.5">${escapeHtml(msg.snippet)}</p>
+            </div>
+          </td>
+          <td class="text-xs text-[#A3A3A3] max-w-[200px] truncate" title="${escapeHtml(msg.from)}">${escapeHtml(msg.from)}</td>
+          <td class="font-mono-num font-semibold text-white whitespace-nowrap">${formatBytes(msg.sizeEstimate)}</td>
+          <td class="whitespace-nowrap">
+            <div class="flex items-center gap-2">
+              <span class="font-mono-num text-xs text-[#A3A3A3]">${formatDateDisplay(msg.internalDate)}</span>
+              <span class="px-2 py-0.5 rounded-md border text-xs font-mono-num ${ageBadgeClass}">${daysAgo} 天</span>
+            </div>
+          </td>
+          <td class="text-right whitespace-nowrap">
+            <div class="inline-flex items-center gap-2">
+              ${!isTrashScope ? `<button type="button" class="btn-secondary text-xs gmail-single-trash-btn" data-id="${escapeHtml(msg.id)}">移至垃圾桶</button>` : ''}
+              <button type="button" class="btn-danger text-xs gmail-single-delete-btn" data-id="${escapeHtml(msg.id)}">永久刪除</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  /* ========================================================================
+     Gmail 電子報與訂閱帳戶管理模組
+     ======================================================================== */
+  function switchGmailSubtab(subtab) {
+    state.gmail.activeSubtab = subtab;
+    const isCleaner = subtab === 'cleaner';
+    el.gmailSubtabCleanerBtn.classList.toggle('is-active', isCleaner);
+    el.gmailSubtabSubscriptionsBtn.classList.toggle('is-active', !isCleaner);
+    el.gmailCleanerPanel.classList.toggle('hidden', !isCleaner);
+    el.gmailSubscriptionsPanel.classList.toggle('hidden', isCleaner);
+
+    if (!isCleaner && state.gmail.subscriptions.length === 0) {
+      scanGmailSubscriptions();
+    }
+  }
+
+  async function scanGmailSubscriptions() {
+    if (state.mode === 'guest') {
+      showToast('請先登入 Google 帳號或啟動展示模式以管理訂閱帳戶。', 'warning');
+      return;
+    }
+    state.gmail.subsLoading = true;
+    el.subScanBtn.classList.add('is-busy');
+    el.subScanBtn.disabled = true;
+    el.subTableBody.innerHTML = `
+      <tr>
+        <td colspan="6" class="py-12 text-center text-[#A3A3A3]">
+          <div class="space-y-3 max-w-md mx-auto">
+            <p class="text-base font-semibold text-white">正在智慧掃描促銷、通知與具備退訂標頭的郵件來源…</p>
+            <div class="quota-bar-track" style="height: 8px;"><div class="quota-segment bg-[#3B82F6]" style="width: 100%;"></div></div>
+          </div>
+        </td>
+      </tr>
+    `;
+
+    try {
+      let subs = [];
+      if (state.mode === 'demo') {
+        await new Promise((r) => setTimeout(r, 260));
+        const promoMessages = state.demoStore.gmailMessages.filter((m) =>
+          !m.inTrash && (m.category === 'promotions' || m.category === 'social' || m.unsubInfo ||
+            (m.subject + m.snippet).toLowerCase().includes('unsubscribe') ||
+            (m.subject + m.snippet).toLowerCase().includes('退訂') ||
+            (m.subject + m.snippet).toLowerCase().includes('電子報'))
+        );
+        const map = new Map();
+        for (const msg of promoMessages) {
+          const sender = parseSender(msg.from);
+          const key = (sender.email || sender.name).toLowerCase();
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              name: sender.name,
+              email: sender.email,
+              count: 0,
+              totalBytes: 0,
+              messageIds: [],
+              unsubInfo: msg.unsubInfo || null
+            });
+          }
+          const s = map.get(key);
+          s.count++;
+          s.totalBytes += Number(msg.sizeEstimate || 0);
+          s.messageIds.push(msg.id);
+          if (!s.unsubInfo && msg.unsubInfo) s.unsubInfo = msg.unsubInfo;
+        }
+        subs = Array.from(map.values()).sort((a, b) => b.totalBytes - a.totalBytes);
+      } else {
+        const query = 'category:promotions OR category:updates OR category:social OR unsubscribe';
+        const listUrl = `${GMAIL_API_BASE}/messages?q=${encodeURIComponent(query)}&maxResults=60`;
+        const listData = await googleApiFetch(listUrl);
+        const refs = listData.messages || [];
+
+        const detailed = await runWithConcurrency(refs, 8, async (ref) => {
+          const detailUrl = `${GMAIL_API_BASE}/messages/${encodeURIComponent(ref.id)}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post`;
+          const msg = await googleApiFetch(detailUrl);
+          const headers = msg.payload?.headers || [];
+          const getHeader = (name) => {
+            const found = headers.find((h) => h.name.toLowerCase() === name.toLowerCase());
+            return found ? found.value : '';
+          };
+          const rawUnsub = getHeader('List-Unsubscribe');
+          return {
+            id: msg.id,
+            from: getHeader('From') || '未知寄件者',
+            sizeEstimate: Number(msg.sizeEstimate || 0),
+            unsubInfo: parseUnsubscribeHeader(rawUnsub)
+          };
+        });
+
+        const map = new Map();
+        for (const msg of detailed) {
+          const sender = parseSender(msg.from);
+          const key = (sender.email || sender.name).toLowerCase();
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              name: sender.name,
+              email: sender.email,
+              count: 0,
+              totalBytes: 0,
+              messageIds: [],
+              unsubInfo: msg.unsubInfo || null
+            });
+          }
+          const s = map.get(key);
+          s.count++;
+          s.totalBytes += Number(msg.sizeEstimate || 0);
+          s.messageIds.push(msg.id);
+          if (!s.unsubInfo && msg.unsubInfo) s.unsubInfo = msg.unsubInfo;
+        }
+        subs = Array.from(map.values()).sort((a, b) => b.totalBytes - a.totalBytes);
+      }
+
+      state.gmail.subscriptions = subs;
+      renderGmailSubscriptions();
+      showToast(`已成功掃描出 ${subs.length} 個訂閱帳戶與通知來源。`, 'success');
+    } catch (err) {
+      showToast(`掃描訂閱帳戶失敗：${err.message}`, 'error');
+      el.subTableBody.innerHTML = `
+        <tr>
+          <td colspan="6" class="py-12 text-center text-[#FCA5A5]">掃描失敗：${escapeHtml(err.message)}</td>
+        </tr>
+      `;
+    } finally {
+      state.gmail.subsLoading = false;
+      el.subScanBtn.classList.remove('is-busy');
+      el.subScanBtn.disabled = false;
+    }
+  }
+
+  function renderGmailSubscriptions() {
+    const subs = state.gmail.subscriptions;
+    const totalCount = subs.length;
+    const messageCount = subs.reduce((sum, s) => sum + s.count, 0);
+    const totalBytes = subs.reduce((sum, s) => sum + s.totalBytes, 0);
+    const unsubCount = subs.filter((s) => s.unsubInfo).length;
+
+    el.subStatsTotalCount.textContent = String(totalCount);
+    el.subStatsMessageCount.textContent = String(messageCount);
+    el.subStatsTotalBytes.textContent = formatBytes(totalBytes);
+    el.subStatsUnsubCount.textContent = String(unsubCount);
+
+    if (subs.length === 0) {
+      el.subTableBody.innerHTML = `
+        <tr>
+          <td colspan="6" class="py-12 text-center text-[#A3A3A3]">
+            <p class="text-white font-semibold mb-1">未發現大量累積的訂閱帳戶或電子報信件</p>
+            <p class="text-xs">若有特定外部服務，可於信件清理搜尋中輸入該來源信箱直接篩選處理。</p>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    el.subTableBody.innerHTML = subs.map((s) => {
+      let badgeHtml = '';
+      if (s.unsubInfo?.httpUrl) {
+        badgeHtml = `<span class="unsub-badge-web"><i class="ph ph-globe" aria-hidden="true"></i>支援網頁一鍵退訂</span>`;
+      } else if (s.unsubInfo?.mailtoUrl) {
+        badgeHtml = `<span class="unsub-badge-mail"><i class="ph ph-envelope-simple" aria-hidden="true"></i>支援郵件退訂</span>`;
+      } else {
+        badgeHtml = `<span class="unsub-badge-manual"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>無退訂標頭（可一鍵搜尋封鎖）</span>`;
+      }
+
+      return `
+        <tr class="sub-account-row" data-sender-key="${escapeHtml(s.key)}">
+          <td>
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-md bg-[#272727] border border-[#313131] flex items-center justify-center shrink-0">
+                <i class="ph ph-bell-simple text-sm text-[#A3A3A3]" aria-hidden="true"></i>
+              </span>
+              <strong class="text-white text-sm truncate max-w-[200px]" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</strong>
+            </div>
+          </td>
+          <td>
+            <span class="font-mono text-xs text-[#A3A3A3] truncate block max-w-[220px]" title="${escapeHtml(s.email)}">${escapeHtml(s.email || '未提供獨立信箱')}</span>
+          </td>
+          <td>
+            <span class="font-mono-num font-semibold text-white whitespace-nowrap">${s.count} 封</span>
+          </td>
+          <td>
+            <span class="font-mono-num font-semibold text-[#10B981] whitespace-nowrap">${formatBytes(s.totalBytes)}</span>
+          </td>
+          <td class="whitespace-nowrap">
+            ${badgeHtml}
+          </td>
+          <td class="text-right whitespace-nowrap">
+            <div class="inline-flex items-center gap-2">
+              ${s.unsubInfo ? `
+                <button type="button" class="btn-success text-xs sub-action-unsub-btn" data-sender-key="${escapeHtml(s.key)}">
+                  <i class="ph ph-bell-slash text-xs" aria-hidden="true"></i>
+                  <span>取消訂閱</span>
+                </button>
+              ` : `
+                <button type="button" class="btn-secondary text-xs sub-action-search-btn" data-sender-key="${escapeHtml(s.key)}" data-sender-email="${escapeHtml(s.email)}">
+                  <i class="ph ph-magnifying-glass text-xs" aria-hidden="true"></i>
+                  <span>搜尋此寄件者</span>
+                </button>
+              `}
+              <button type="button" class="btn-secondary text-xs sub-action-trash-btn" data-sender-key="${escapeHtml(s.key)}">
+                <span>清入垃圾桶</span>
+              </button>
+              <button type="button" class="btn-danger text-xs sub-action-delete-btn" data-sender-key="${escapeHtml(s.key)}">
+                <span>永久刪除</span>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function handleUnsubscribe(sub) {
+    if (!sub || !sub.unsubInfo) {
+      showToast('此寄件者未提供標準退訂標頭，建議搜尋該寄件者建立 Gmail 封鎖篩選器。', 'info');
+      return;
+    }
+    const { httpUrl, mailtoUrl } = sub.unsubInfo;
+    if (httpUrl) {
+      window.open(httpUrl, '_blank', 'noopener,noreferrer');
+      showToast(`已在新分頁開啟「${sub.name}」的取消訂閱頁面，請於該頁面確認取消訂閱。`, 'success');
+    } else if (mailtoUrl) {
+      window.location.href = mailtoUrl;
+      showToast(`已開啟郵件軟體向「${sub.name}」發送取消訂閱請求郵件。`, 'info');
+    }
+  }
+
+  function cleanupSubscriptionMessages(senderKey, permanent) {
+    const sub = state.gmail.subscriptions.find((s) => s.key === senderKey);
+    if (!sub || sub.messageIds.length === 0) return;
+    executeGmailDeletion(sub.messageIds, permanent);
   }
 
   function sortGmailList(list) {
@@ -2918,88 +3574,6 @@
     el.gmailSelectAllCheckbox.checked = state.gmail.items.length > 0 && selected.length === state.gmail.items.length;
     updateSortHeaderUI();
     renderLiveStorageVisualizer();
-  }
-
-  function renderGmailTable() {
-    if (state.mode === 'guest') {
-      el.gmailTableBody.innerHTML = `
-        <tr>
-          <td colspan="6" class="py-12 text-center">
-            <div class="space-y-3 max-w-md mx-auto">
-              <p class="text-base font-semibold text-white">尚未載入 Gmail 郵件清單</p>
-              <p class="text-sm text-[#A3A3A3]">請返回「使用量總覽」登入 Google 帳號並授權 Gmail 權限，或啟動模擬展示模式體驗。</p>
-            </div>
-          </td>
-        </tr>
-      `;
-      el.gmailPaginationWrap.classList.add('hidden');
-      updateGmailSelectionStats();
-      return;
-    }
-
-    if (state.gmail.items.length === 0) {
-      el.gmailTableBody.innerHTML = `
-        <tr>
-          <td colspan="6" class="py-12 text-center">
-            <div class="space-y-2 max-w-md mx-auto">
-              <p class="text-base font-semibold text-white">沒有符合此查詢條件的 Gmail 信件</p>
-              <p class="text-sm text-[#A3A3A3]">建議調降 MB 門檻或縮短存放天數後再點擊「搜尋符合信件」。</p>
-            </div>
-          </td>
-        </tr>
-      `;
-      el.gmailPaginationWrap.classList.add('hidden');
-      updateGmailSelectionStats();
-      return;
-    }
-
-    const isTrashScope = el.gmailCategoryFilter.value === 'in:trash';
-
-    el.gmailTableBody.innerHTML = state.gmail.items.map((msg) => {
-      const checked = state.gmail.selectedIds.has(msg.id);
-      const daysAgo = calcDaysAgo(msg.internalDate);
-      const ageBadgeClass = daysAgo >= 365
-        ? 'bg-[#3B1212] border-[#7F1D1D] text-[#FCA5A5]'
-        : daysAgo >= 180
-          ? 'bg-[#451A03] border-[#78350F] text-[#FCD34D]'
-          : 'bg-[#272727] border-[#313131] text-[#A3A3A3]';
-
-      return `
-        <tr class="${checked ? 'is-selected' : ''}">
-          <td>
-            <input type="checkbox" class="gmail-row-checkbox w-4 h-4 rounded accent-[#3B82F6] cursor-pointer" data-id="${escapeHtml(msg.id)}" ${checked ? 'checked' : ''} aria-label="選取信件 ${escapeHtml(msg.subject)}">
-          </td>
-          <td>
-            <div class="min-w-[220px] max-w-[360px]">
-              <p class="font-semibold text-white truncate" title="${escapeHtml(msg.subject)}">${escapeHtml(msg.subject)}</p>
-              <p class="text-xs text-[#737373] truncate">${escapeHtml(msg.snippet)}</p>
-            </div>
-          </td>
-          <td class="text-xs text-[#A3A3A3] max-w-[200px] truncate" title="${escapeHtml(msg.from)}">${escapeHtml(msg.from)}</td>
-          <td class="font-mono-num font-semibold text-white whitespace-nowrap">${formatBytes(msg.sizeEstimate)}</td>
-          <td class="whitespace-nowrap">
-            <div class="flex items-center gap-2">
-              <span class="font-mono-num text-xs text-[#A3A3A3]">${formatDateDisplay(msg.internalDate)}</span>
-              <span class="px-2 py-0.5 rounded-md border text-xs font-mono-num ${ageBadgeClass}">${daysAgo} 天</span>
-            </div>
-          </td>
-          <td class="text-right whitespace-nowrap">
-            <div class="inline-flex items-center gap-2">
-              ${!isTrashScope ? `<button type="button" class="btn-secondary text-xs gmail-single-trash-btn" data-id="${escapeHtml(msg.id)}">移至垃圾桶</button>` : ''}
-              <button type="button" class="btn-danger text-xs gmail-single-delete-btn" data-id="${escapeHtml(msg.id)}">永久刪除</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-    if (state.gmail.nextPageToken) {
-      el.gmailPaginationWrap.classList.remove('hidden');
-    } else {
-      el.gmailPaginationWrap.classList.add('hidden');
-    }
-
-    updateGmailSelectionStats();
   }
 
   /* ========================================================================
@@ -3658,6 +4232,163 @@
     });
 
     // Gmail 查詢與事件委派
+    el.gmailSubtabCleanerBtn.addEventListener('click', () => switchGmailSubtab('cleaner'));
+    el.gmailSubtabSubscriptionsBtn.addEventListener('click', () => switchGmailSubtab('subscriptions'));
+
+    el.gmailViewModeGroupedBtn.addEventListener('click', () => {
+      state.gmail.viewMode = 'grouped';
+      el.gmailViewModeGroupedBtn.className = 'px-2.5 py-1 rounded-md font-semibold text-white bg-[#272727] border border-[#383838]';
+      el.gmailViewModeFlatBtn.className = 'px-2.5 py-1 rounded-md font-semibold text-[#A3A3A3] hover:text-white bg-transparent border-0';
+      renderGmailTable();
+    });
+
+    el.gmailViewModeFlatBtn.addEventListener('click', () => {
+      state.gmail.viewMode = 'flat';
+      el.gmailViewModeFlatBtn.className = 'px-2.5 py-1 rounded-md font-semibold text-white bg-[#272727] border border-[#383838]';
+      el.gmailViewModeGroupedBtn.className = 'px-2.5 py-1 rounded-md font-semibold text-[#A3A3A3] hover:text-white bg-transparent border-0';
+      renderGmailTable();
+    });
+
+    el.gmailExpandAllBtn.addEventListener('click', () => {
+      state.gmail.collapsedSenders.clear();
+      renderGmailTable();
+    });
+
+    el.gmailCollapseAllBtn.addEventListener('click', () => {
+      const groups = groupGmailBySender(state.gmail.items);
+      groups.forEach((g) => state.gmail.collapsedSenders.add(g.key));
+      renderGmailTable();
+    });
+
+    el.gmailGroupedContainer.addEventListener('click', (e) => {
+      // 點擊群組內的單信垃圾桶按鈕
+      const singleTrashBtn = e.target.closest('.gmail-single-trash-btn');
+      if (singleTrashBtn) {
+        e.stopPropagation();
+        executeGmailDeletion([singleTrashBtn.dataset.id], false);
+        return;
+      }
+      // 點擊群組內的單信永久刪除按鈕
+      const singleDelBtn = e.target.closest('.gmail-single-delete-btn');
+      if (singleDelBtn) {
+        e.stopPropagation();
+        executeGmailDeletion([singleDelBtn.dataset.id], true);
+        return;
+      }
+      // 點擊群組退訂按鈕
+      const quickUnsubBtn = e.target.closest('.sub-quick-unsub-btn');
+      if (quickUnsubBtn) {
+        e.stopPropagation();
+        const key = quickUnsubBtn.dataset.senderKey;
+        const groups = groupGmailBySender(state.gmail.items);
+        const target = groups.find((g) => g.key === key);
+        if (target) handleUnsubscribe(target);
+        return;
+      }
+      // 點擊整組移入垃圾桶
+      const groupTrashBtn = e.target.closest('.sender-group-trash-btn');
+      if (groupTrashBtn) {
+        e.stopPropagation();
+        const key = groupTrashBtn.dataset.senderKey;
+        const groups = groupGmailBySender(state.gmail.items);
+        const target = groups.find((g) => g.key === key);
+        if (target) executeGmailDeletion(target.messages.map((m) => m.id), false);
+        return;
+      }
+      // 點擊整組永久刪除
+      const groupDelBtn = e.target.closest('.sender-group-delete-btn');
+      if (groupDelBtn) {
+        e.stopPropagation();
+        const key = groupDelBtn.dataset.senderKey;
+        const groups = groupGmailBySender(state.gmail.items);
+        const target = groups.find((g) => g.key === key);
+        if (target) executeGmailDeletion(target.messages.map((m) => m.id), true);
+        return;
+      }
+      // 點擊群組全選方塊
+      const groupCheckbox = e.target.closest('.sender-group-select-checkbox');
+      if (groupCheckbox) {
+        e.stopPropagation();
+        const key = groupCheckbox.dataset.senderKey;
+        const groups = groupGmailBySender(state.gmail.items);
+        const target = groups.find((g) => g.key === key);
+        if (target) {
+          const checked = groupCheckbox.checked;
+          target.messages.forEach((m) => {
+            if (checked) state.gmail.selectedIds.add(m.id);
+            else state.gmail.selectedIds.delete(m.id);
+          });
+          renderGmailTable();
+        }
+        return;
+      }
+      // 點擊單信 checkbox
+      const rowCheckbox = e.target.closest('.gmail-row-checkbox');
+      if (rowCheckbox) {
+        e.stopPropagation();
+        const id = rowCheckbox.dataset.id;
+        if (rowCheckbox.checked) state.gmail.selectedIds.add(id);
+        else state.gmail.selectedIds.delete(id);
+        renderGmailTable();
+        return;
+      }
+      // 點擊卡片標頭展開／收合
+      const header = e.target.closest('.sender-group-header');
+      if (header) {
+        const card = header.closest('.sender-group-card');
+        if (card) {
+          const key = card.dataset.senderKey;
+          const isCurrentlyExpanded = card.classList.contains('is-expanded');
+          if (isCurrentlyExpanded) {
+            state.gmail.collapsedSenders.add(key);
+            card.classList.remove('is-expanded');
+          } else {
+            state.gmail.collapsedSenders.delete(key);
+            card.classList.add('is-expanded');
+          }
+        }
+      }
+    });
+
+    // 訂閱管理中心事件
+    el.subScanBtn.addEventListener('click', () => scanGmailSubscriptions());
+    el.subTableBody.addEventListener('click', (e) => {
+      const unsubBtn = e.target.closest('.sub-action-unsub-btn');
+      if (unsubBtn) {
+        const key = unsubBtn.dataset.senderKey;
+        const sub = state.gmail.subscriptions.find((s) => s.key === key);
+        if (sub) handleUnsubscribe(sub);
+        return;
+      }
+
+      const searchBtn = e.target.closest('.sub-action-search-btn');
+      if (searchBtn) {
+        const email = searchBtn.dataset.senderEmail;
+        switchGmailSubtab('cleaner');
+        el.gmailSearchInput.value = `from:${email}`;
+        el.gmailSizeFilter.value = '0';
+        el.gmailDaysFilter.value = '0';
+        el.gmailCategoryFilter.value = 'all';
+        loadGmailMessages(false);
+        showToast(`已切換至信件清單並搜尋來自 ${email} 的所有信件。`, 'info');
+        return;
+      }
+
+      const trashBtn = e.target.closest('.sub-action-trash-btn');
+      if (trashBtn) {
+        const key = trashBtn.dataset.senderKey;
+        cleanupSubscriptionMessages(key, false);
+        return;
+      }
+
+      const delBtn = e.target.closest('.sub-action-delete-btn');
+      if (delBtn) {
+        const key = delBtn.dataset.senderKey;
+        cleanupSubscriptionMessages(key, true);
+        return;
+      }
+    });
+
     el.gmailApplyFilterBtn.addEventListener('click', () => {
       if (state.mode === 'guest') {
         showToast('請先於「使用量總覽」登入 Google 帳號，或啟動模擬展示模式。', 'warning');

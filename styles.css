@@ -823,6 +823,158 @@ select:focus-visible {
   cursor: pointer;
 }
 
+/* ========================================================================
+   Gmail 寄件者收合與訂閱管理專用樣式
+   ======================================================================== */
+.subtab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background-color: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all 250ms var(--ease-out-expo);
+}
+
+.subtab-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-surface-3);
+  border-color: #404040;
+}
+
+.subtab-btn.is-active {
+  color: #FFFFFF;
+  background-color: #262626;
+  border-color: #525252;
+}
+
+/* 寄件者分組收合卡片 */
+.sender-group-card {
+  background-color: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 250ms var(--ease-out-expo);
+}
+
+.sender-group-card:hover {
+  border-color: #404040;
+}
+
+.sender-group-card.is-expanded {
+  border-color: #525252;
+}
+
+.sender-group-header {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  background-color: #1A1A1A;
+  border-bottom: 1px solid transparent;
+  user-select: none;
+  transition: background-color 200ms var(--ease-out-expo), border-color 200ms var(--ease-out-expo);
+}
+
+.sender-group-card.is-expanded .sender-group-header {
+  border-bottom-color: var(--border-subtle);
+  background-color: #212121;
+}
+
+.sender-group-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  transition: transform 300ms var(--ease-out-expo), color 200ms var(--ease-out-expo);
+}
+
+.sender-group-card.is-expanded .sender-group-arrow {
+  transform: rotate(90deg);
+  color: #FFFFFF;
+}
+
+.sender-group-content {
+  display: none;
+}
+
+.sender-group-card.is-expanded .sender-group-content {
+  display: block;
+}
+
+.sender-group-item {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface-1);
+  transition: background-color 200ms var(--ease-out-expo);
+}
+
+.sender-group-item:last-child {
+  border-bottom: 0;
+}
+
+.sender-group-item:hover {
+  background-color: var(--bg-surface-2);
+}
+
+.sender-group-item.is-selected {
+  background-color: #17212E;
+}
+
+/* 訂閱來源標籤 */
+.unsub-badge-web {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background-color: #064E3B;
+  color: #6EE7B7;
+  border: 1px solid #059669;
+}
+
+.unsub-badge-mail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background-color: #1E293B;
+  color: #93C5FD;
+  border: 1px solid #3B82F6;
+}
+
+.unsub-badge-manual {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background-color: #272727;
+  color: #A3A3A3;
+  border: 1px solid #313131;
+}
+
 /* Reduced motion 支援 */
 @media (prefers-reduced-motion: reduce) {
   *,
